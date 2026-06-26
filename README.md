@@ -1,13 +1,12 @@
-# HSB Reserve App v4
+# HSB Reserve App v5
 
 Single Cloudflare Worker application.
 
-v4 changes:
-- Keeps table chronological by scheduled take-off.
-- Adds next relevant event banner.
-- Top box shows still-callable flights.
-- Better operational colours.
-- Keeps v3 flight-status safeguards.
+v5 changes:
+- Compact table width for iPad.
+- Removed Reg, Confidence, and Latest on-blocks columns.
+- Shorter flight-status labels.
+- Better row colouring while keeping chronological order.
 
 Required Cloudflare secret:
 
