@@ -1,14 +1,14 @@
-# HSB Reserve App v6.1
+# HSB Reserve App v7
 
 Single Cloudflare Worker application.
 
-v6.1 changes:
-- Fixed the v6 startup crash.
-- Uses full "Scheduled" wording.
-- Prevents yesterday's landed overnight sector being used for today's BA057/BA055.
-- Active without departure evidence shows Awaiting departure, not safe.
-- Adds coloured 3D-style status dots.
-- Tightens table row spacing and slightly increases table text size.
+v7 changes:
+- Dark operational dashboard.
+- Still-callable list moved to the top.
+- Call/Safe columns merged into one Call by column.
+- Reserve column removed; coloured dots show reserve state.
+- BA-style statuses: Planned, Delayed, Departed, Cancelled, Diverted, Unknown.
+- Keeps rows chronological by scheduled take-off.
 
 Required Cloudflare secret:
 
