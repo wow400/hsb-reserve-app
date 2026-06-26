@@ -1,16 +1,15 @@
-# HSB Reserve App v7.1
+# HSB Reserve App v8
 
 Single Cloudflare Worker application.
 
-v7.1 fixes:
-- Fixed JavaScript startup issue from v7.
-- Restored UTC clock, still-callable card, stats, and table rendering.
-- Removed empty gold box.
-- Kept dark operational layout.
-- Kept table chronological.
-- Merged Call/Safe into Call by.
-- Removed Reserve column; coloured dots show reserve state.
-- BA-style statuses: Planned, Delayed, Departed, Cancelled, Diverted, Unknown.
+v8 fixes:
+- Status no longer falls back to Unknown when FICO timing gives a usable state.
+- Planned / Delayed / Departed terminology.
+- Grey dots fixed.
+- Top still-callable list excludes safe flights.
+- Counts now follow operational state, not API availability alone.
+- Keeps table chronological.
+- Keeps dark operational v7 layout.
 
 Required Cloudflare secret:
 
