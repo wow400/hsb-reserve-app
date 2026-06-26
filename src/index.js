@@ -134,13 +134,13 @@ async function handleStatus(request, env) {
 
   const response = jsonResponse({
     ok: true,
-    version: "v7.1",
+    version: "v8",
     source: "aviationstack",
     updated: new Date().toISOString(),
     flights: results
   });
 
-  response.headers.set("Cache-Control", "public, max-age=60");
+  response.headers.set("Cache-Control", "public, max-age=45");
   await cache.put(cacheKey, response.clone());
   return response;
 }
@@ -151,10 +151,8 @@ function normaliseFlight(value) {
 
 function flightVariants(flight) {
   const variants = [flight];
-
   const m = flight.match(/^([A-Z]{2})(0+)(\d+)$/);
   if (m) variants.push(m[1] + String(Number(m[3])));
-
   return [...new Set(variants)];
 }
 
@@ -181,11 +179,19 @@ function pickBestMatch(data, requestedFlight) {
   if (!matches.length) return null;
 
   const today = new Date().toISOString().slice(0, 10);
-
-  // Do not use yesterday's already-landed overnight sector for today's BA055/BA057.
   const todayMatches = matches.filter(item => item.flight_date === today);
-  if (!todayMatches.length) return null;
 
+  // First choice: today's sector. Prevents BA057/BA055 using yesterday's landed overnight flight.
+  if (todayMatches.length) {
+    return rankMatches(todayMatches)[0];
+  }
+
+  // Fallback: if AviationStack has no flight_date match, do not return yesterday's landed flight.
+  const nonLanded = matches.filter(item => item.flight_status !== "landed");
+  return nonLanded.length ? rankMatches(nonLanded)[0] : null;
+}
+
+function rankMatches(matches) {
   const statusRank = {
     active: 1,
     scheduled: 2,
@@ -195,7 +201,7 @@ function pickBestMatch(data, requestedFlight) {
     incident: 6
   };
 
-  return todayMatches.sort((a, b) => {
+  return matches.sort((a, b) => {
     const ra = statusRank[a.flight_status] || 99;
     const rb = statusRank[b.flight_status] || 99;
     if (ra !== rb) return ra - rb;
@@ -203,7 +209,7 @@ function pickBestMatch(data, requestedFlight) {
     const ta = Date.parse(a?.departure?.scheduled || "") || 0;
     const tb = Date.parse(b?.departure?.scheduled || "") || 0;
     return ta - tb;
-  })[0];
+  });
 }
 
 function classifyFlight(rawStatus, dep, arr, live) {
@@ -352,6 +358,8 @@ h1{margin:0;font-size:1.65rem;letter-spacing:-.03em}
   border-color:rgba(255,196,0,.65);
   padding:14px 16px;
 }
+.top-safe{border-color:rgba(65,212,90,.65)}
+.top-pre{border-color:rgba(88,166,255,.65)}
 .callable-head{
   display:flex;
   justify-content:space-between;
@@ -362,6 +370,8 @@ h1{margin:0;font-size:1.65rem;letter-spacing:-.03em}
   font-weight:900;
   font-size:1.35rem;
 }
+.top-safe .callable-head{color:var(--green)}
+.top-pre .callable-head{color:var(--blue)}
 .callable-sub{color:var(--muted);font-size:.9rem;font-weight:500}
 .callable-row{
   display:grid;
@@ -500,7 +510,7 @@ td{color:#eef3f8}
 <main class="app">
 <section class="header">
   <div>
-    <h1>HSB Reserve App <span class="version">v7.1</span></h1>
+    <h1>HSB Reserve App <span class="version">v8</span></h1>
     <p class="sub">All times in Zulu (Z). Primary view shows flights you could still be called for.</p>
   </div>
   <div class="controls">
@@ -566,7 +576,7 @@ let lastStatusUpdate = null;
 
 const HSB_TO_CHOCKS_LIMIT = 1140;
 const CALL_BEFORE_TAKEOFF = 120;
-const STORAGE_KEY = "hsb-reserve-fico-v7-1";
+const STORAGE_KEY = "hsb-reserve-fico-v8";
 
 function toMin(t) {
   const p = t.split(":").map(Number);
@@ -705,9 +715,9 @@ function computeRows() {
     const callByReason = hsbEnd < latestCall ? "HSB finish" : "Latest call";
     const delta = futureDelta(callBy, now);
     const fs = statuses[f.flight] || {
-      status: "unknown",
+      status: "no_api_data",
       found: false,
-      label: "Unknown",
+      label: null,
       confidence: "none",
       safe_by_status: false
     };
@@ -728,41 +738,54 @@ function computeRows() {
   };
 }
 
+function apiHasUsefulStatus(f) {
+  return f.fs && f.fs.found && f.fs.label && f.fs.label !== "Unknown";
+}
+
+function operationalStatus(f, state) {
+  if (f.fs && f.fs.safe_by_status) return f.fs.label || "Departed";
+  if (state.hsbFinished || f.delta < 0) return "Safe";
+
+  if (apiHasUsefulStatus(f)) return f.fs.label;
+
+  // Fallback from FICO timing. This prevents every row turning grey/Unknown just because
+  // AviationStack failed to return a record.
+  if (state.now >= f.schedTO) return "Delayed";
+  return "Planned";
+}
+
 function isSafe(f, state) {
-  return f.fs.safe_by_status || state.hsbFinished || f.delta < 0;
+  return (f.fs && f.fs.safe_by_status) || state.hsbFinished || f.delta < 0;
 }
 
 function isLive(f, state) {
   return !state.hsbNotStarted && !isSafe(f, state);
 }
 
+function isUnknown(f, state) {
+  return operationalStatus(f, state) === "Unknown";
+}
+
 function dotClassFor(f, state) {
   if (state.hsbNotStarted) return "dot-blue";
   if (isSafe(f, state)) return "dot-green";
-  if (!f.fs.found) return "dot-grey";
+  if (isUnknown(f, state)) return "dot-grey";
   if (f.delta <= 30) return "dot-red";
   return "dot-amber";
 }
 
 function rowClassFor(f, state) {
   if (state.hsbNotStarted) return "row-pre";
-  if (isSafe(f, state)) return f.fs.safe_by_status ? "row-departed" : "row-safe";
+  if (isSafe(f, state)) return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe";
   if (f.delta <= 30) return "row-critical";
   return "row-live";
 }
 
-function statusText(f, state) {
-  if (f.fs.safe_by_status) return f.fs.label || "Departed";
-  if (state.hsbFinished || f.delta < 0) return "Safe";
-  if (!f.fs.found) return "Unknown";
-  return f.fs.label || "Unknown";
-}
-
 function statusClass(f, state) {
-  const s = statusText(f, state);
+  const s = operationalStatus(f, state);
   if (s === "Planned") return "status-planned";
   if (s === "Delayed") return "status-delayed";
-  if (s === "Safe" || s === "Departed") return "status-safe";
+  if (s === "Safe" || s === "Departed" || s === "Cancelled" || s === "Diverted") return "status-safe";
   if (s === "Unknown") return "status-unknown";
   return "status-live";
 }
@@ -789,7 +812,10 @@ function renderCallable(state) {
   const el = document.getElementById("aliveList");
   const live = state.rows.filter(f => isLive(f, state));
 
+  el.className = "card top-callable";
+
   if (state.hsbNotStarted) {
+    el.className = "card top-callable top-pre";
     el.innerHTML =
       "<div class='callable-head'><span><i class='dot dot-blue'></i> HSB NOT STARTED</span><span class='callable-sub'>Starts in " +
       dur(state.hsbStartDelta) +
@@ -798,6 +824,7 @@ function renderCallable(state) {
   }
 
   if (!live.length) {
+    el.className = "card top-callable top-safe";
     el.innerHTML =
       "<div class='callable-head'><span><i class='dot dot-green'></i> NO FLIGHTS STILL CALLABLE</span><span class='callable-sub'>Safe by time/status</span></div>";
     return;
@@ -831,7 +858,7 @@ function renderStats(state) {
   const safe = state.rows.filter(f => isSafe(f, state)).length;
   const live = state.rows.filter(f => isLive(f, state)).length;
   const action = state.rows.filter(f => isLive(f, state) && f.delta <= 30).length;
-  const unknown = state.rows.filter(f => !f.fs.found).length;
+  const unknown = state.rows.filter(f => isUnknown(f, state)).length;
   const notStarted = state.hsbNotStarted ? state.rows.length : 0;
 
   document.getElementById("stats").innerHTML =
@@ -891,7 +918,7 @@ function renderTable(state) {
       "<td class='" +
       statusClass(f, state) +
       "'>" +
-      statusText(f, state) +
+      operationalStatus(f, state) +
       "</td>" +
       "<td>" +
       countdownText(f, state) +
