@@ -90,7 +90,7 @@ async function handleStatus(request, env) {
     };
   }
 
-  const response = jsonResponse({ ok: true, version: "v4", source: "aviationstack", updated: new Date().toISOString(), flights: results });
+  const response = jsonResponse({ ok: true, version: "v5", source: "aviationstack", updated: new Date().toISOString(), flights: results });
   response.headers.set("Cache-Control", "public, max-age=60");
   await cache.put(cacheKey, response.clone());
   return response;
@@ -171,23 +171,23 @@ textarea{min-height:170px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas
 button{border:0;border-radius:12px;padding:11px 14px;background:#111;color:#fff;font-weight:900;font-size:.95rem}
 button.secondary{background:#555}
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{width:100%;min-width:1460px;border-collapse:collapse;font-size:.88rem}
+table{width:100%;min-width:1040px;border-collapse:collapse;font-size:.88rem}
 th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;white-space:nowrap;vertical-align:top}
 th{background:#f8f9fb;font-weight:900;font-size:.78rem;color:#333}
 .badge{background:var(--call-bg);font-weight:900;border-radius:8px;display:inline-block;padding:4px 7px}
 .ok{color:var(--ok);font-weight:900}.amber{color:var(--amber);font-weight:900}.safe{color:#000;font-weight:900}.prestatus{color:#244e9b;font-weight:900}.bad{color:var(--bad);font-weight:900}.uncertain{color:#8a5a00;font-weight:900}.red{color:var(--red);font-weight:900}
-.row-safe{background:var(--safe-bg);color:#000}.row-safe .badge{background:#fff;color:#000}.row-pre{background:#fbfdff}.row-departed{background:var(--dep-bg)}.row-uncertain{background:#fffaf0}.row-critical{background:#fff0f0}
+.row-safe{background:#e9f7ec;color:#000}.row-safe .badge{background:#fff;color:#000}.row-pre{background:#eef3ff}.row-departed{background:#f1f1f1}.row-uncertain{background:#fff7df}.row-critical{background:#ffe5e5}.row-live{background:#fffaf0}
 .status-link{display:inline-block;text-decoration:none;background:#111;color:#fff;padding:7px 9px;border-radius:9px;font-size:.78rem;font-weight:900}
 .note{color:var(--muted);font-size:.78rem;line-height:1.35;padding:12px 14px;border-top:1px solid var(--line);background:#fbfbfc}
 .parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
-@media(max-width:700px){.grid{grid-template-columns:1fr}.tile{grid-template-columns:1fr}.tile .remaining{text-align:left}table{font-size:.82rem;min-width:1380px}th,td{padding:8px 6px}.button-row{display:block}button{width:100%;margin-top:8px}}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.tile{grid-template-columns:1fr}.tile .remaining{text-align:left}table{font-size:.82rem;min-width:1040px}th,td{padding:8px 6px}.button-row{display:block}button{width:100%;margin-top:8px}}
 </style>
 </head>
 <body>
 <main class="app">
 <section class="card top">
-<h1>HSB Reserve App v4</h1>
-<p class="sub">Chronological flight table. Status refreshes automatically. Top panels show next relevant event and flights still callable.</p>
+<h1>HSB Reserve App v5</h1>
+<p class="sub">Compact chronological table. Status refreshes automatically. Colours show reserve relevance.</p>
 <div class="grid">
 <div><label for="hsbStart">HSB start Z</label><input id="hsbStart" type="time" value="12:00"></div>
 <div><label for="hsbEnd">HSB finish Z</label><input id="hsbEnd" type="time" value="20:00"></div>
@@ -206,17 +206,17 @@ th{background:#f8f9fb;font-weight:900;font-size:.78rem;color:#333}
 <section class="card">
 <div class="table-scroll">
 <table>
-<thead><tr><th>Flight</th><th>Reg</th><th>Route</th><th>Sched T/O</th><th>Sched arr</th><th>Block</th><th>Latest on-blocks</th><th>Latest T/O</th><th>Latest call</th><th>Safe after</th><th>Flight status</th><th>Confidence</th><th>Delay</th><th>Countdown</th><th>Reserve status</th><th>Google</th></tr></thead>
+<thead><tr><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Latest T/O</th><th>Call</th><th>Safe</th><th>Status</th><th>Countdown</th><th>Reserve</th><th>Google</th></tr></thead>
 <tbody id="rows"></tbody>
 </table>
 </div>
-<div class="note">v4 keeps rows sorted chronologically by scheduled take-off. Risk is shown by colour/status, not by moving rows around.</div>
+<div class="note">v5 compact table. Rows stay chronological; colour shows safe/live/last-chance state.</div>
 </section>
 </main>
 <script>
 let flights=[];let statuses={};let lastStatusUpdate=null;
 const HSB_TO_CHOCKS_LIMIT=1140,CALL_BEFORE_TAKEOFF=120;
-const STORAGE_KEY="hsb-reserve-fico-v4";
+const STORAGE_KEY="hsb-reserve-fico-v5";
 function toMin(t){const p=t.split(":").map(Number);return p[0]*60+p[1]}
 function compactToMin(s){s=String(s).replace(/\\D/g,"").padStart(4,"0");return Number(s.slice(0,2))*60+Number(s.slice(2,4))}
 function minToBlock(mins){mins=Math.abs(mins);return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0")}
@@ -233,7 +233,14 @@ function computeRows(){const startInput=document.getElementById("hsbStart").valu
 function render(){document.getElementById("utcClock").textContent="UTC "+utcNowText();const state=computeRows();if(!state)return;const{rows:computed,hsbStart,hsbEnd,latestOnBlocks,hsbStartDelta,hsbFinishDelta,hsbNotStarted,hsbFinished}=state;const statusAge=lastStatusUpdate?Math.max(0,Math.round((Date.now()-lastStatusUpdate.getTime())/1000))+"s ago":"not yet updated";document.getElementById("summary").innerHTML="<strong>HSB:</strong> "+fmt(hsbStart)+"–"+fmt(hsbEnd)+"<br><strong>Latest on-blocks:</strong> "+fmt(latestOnBlocks)+"<br><strong>Flights parsed:</strong> "+flights.length+"<br><strong>Status updated:</strong> "+statusAge+"<br><strong>Rule:</strong> Safe after the earlier of latest call, HSB finish, confirmed departure/landing, cancellation or diversion.";const live=computed.filter(f=>!hsbNotStarted&&!hsbFinished&&f.delta>=0&&!f.fs.safe_by_status);renderNextEvent(state,live);renderLiveBox(state,live);renderTable(state)}
 function renderNextEvent(state,live){const el=document.getElementById("nextEvent");if(state.hsbNotStarted){el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>HSB starts at "+fmt(state.hsbStart)+"</span> — in "+dur(state.hsbStartDelta);return}if(state.hsbFinished){el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>HSB finished</span> — no further flights can be allocated.";return}if(!live.length){el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>None</span> — no flights remain live by time/status.";return}const next=live.slice().sort((a,b)=>a.delta-b.delta)[0];el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>"+next.flight+" "+next.to+" safe after "+fmt(next.safeAfter)+"</span> — in "+dur(next.delta)+" ("+next.safeReason+")"}
 function renderLiveBox(state,live){const aliveList=document.getElementById("aliveList");if(state.hsbNotStarted){aliveList.innerHTML="<div class='alive-title'>HSB not started yet</div><div class='tile pre'><div><strong>Standby starts at "+fmt(state.hsbStart)+"</strong></div><div class='call'>HSB finish "+fmt(state.hsbEnd)+"</div><div class='remaining'>starts in "+dur(state.hsbStartDelta)+"</div></div>";return}if(state.hsbFinished){aliveList.innerHTML="<div class='alive-title'>Still callable</div><div class='safe'>HSB finished — no further flights can be allocated.</div>";return}if(!live.length){aliveList.innerHTML="<div class='alive-title'>Still callable</div><div class='safe'>None remaining by time/status.</div>";return}aliveList.innerHTML="<div class='alive-title'>Still callable</div>"+live.map(f=>"<div class='tile "+(f.delta<=30?"critical":"live")+"'><div><strong>"+f.flight+" "+f.to+"</strong></div><div class='call'>Safe after "+fmt(f.safeAfter)+"</div><div class='remaining'>"+dur(f.delta)+"</div></div>").join("")}
-function renderTable(state){const rowsEl=document.getElementById("rows");rowsEl.innerHTML="";for(const f of state.rows){let statusClass="ok",reserveStatus="Live",countdown="in "+dur(f.delta),rowClass="";if(state.hsbNotStarted){statusClass="prestatus";reserveStatus="HSB not started";countdown="HSB starts in "+dur(state.hsbStartDelta);rowClass="row-pre"}if(f.fs.safe_by_status){statusClass="safe";reserveStatus="Safe — "+(f.fs.label||f.fs.status);countdown=f.fs.label||"Safe";rowClass="row-safe row-departed"}else if(f.fs.confidence==="uncertain"){statusClass="uncertain";if(!state.hsbNotStarted)rowClass="row-uncertain"}if(!f.fs.safe_by_status&&(state.hsbFinished||f.delta<0)){statusClass="safe";reserveStatus=state.hsbFinished||f.safeReason==="HSB finish"?"Safe — HSB finished":"Safe — latest call passed";countdown="Safe since "+fmt(state.hsbFinished?state.hsbEnd:f.safeAfter);rowClass="row-safe"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=30){statusClass="red";reserveStatus="Last chance";rowClass="row-critical"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=60){statusClass="amber";reserveStatus=f.safeReason==="HSB finish"?"Last chance — HSB ending":"Last chance"}const delay=f.fs.departure&&f.fs.departure.delay!=null?f.fs.departure.delay+"m":"—";const reg=f.fs.aircraft&&f.fs.aircraft.registration?f.fs.aircraft.registration:"—";const fsText=f.fs.found?(f.fs.label||f.fs.status):"unknown";const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight);const tr=document.createElement("tr");tr.className=rowClass;tr.innerHTML="<td><strong>"+f.flight+"</strong></td><td>"+reg+"</td><td>"+f.route+"</td><td>"+fmt(f.schedTO)+"</td><td>"+fmt(f.schedArr)+"</td><td>"+minToBlock(f.block)+"</td><td>"+fmt(f.latestOnBlocks)+"</td><td>"+fmt(f.latestTO)+"</td><td><span class='badge'>"+fmt(f.latestCall)+"</span></td><td><span class='badge'>"+fmt(f.safeAfter)+"</span><br><small>"+f.safeReason+"</small></td><td>"+fsText+"</td><td>"+(f.fs.confidence||"—")+"</td><td>"+delay+"</td><td>"+countdown+"</td><td class='"+statusClass+"'>"+reserveStatus+"</td><td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";rowsEl.appendChild(tr)}}
+function shortStatus(fs){
+  const label=fs.found?(fs.label||fs.status):"unknown";
+  if(label==="Awaiting departure confirmation")return"Unconfirmed";
+  if(label==="Delayed / estimated")return"Delay";
+  if(label==="Scheduled")return"Sched";
+  return label;
+}
+function renderTable(state){const rowsEl=document.getElementById("rows");rowsEl.innerHTML="";for(const f of state.rows){let statusClass="ok",reserveStatus="Live",countdown="in "+dur(f.delta),rowClass=state.hsbNotStarted?"row-pre":"row-live";if(state.hsbNotStarted){statusClass="prestatus";reserveStatus="HSB not started";countdown="HSB starts in "+dur(state.hsbStartDelta);rowClass="row-pre"}if(f.fs.safe_by_status){statusClass="safe";reserveStatus="Safe — "+(f.fs.label||f.fs.status);countdown=f.fs.label||"Safe";rowClass="row-safe row-departed"}else if(f.fs.confidence==="uncertain"){statusClass="uncertain";if(!state.hsbNotStarted)rowClass="row-uncertain"}if(!f.fs.safe_by_status&&(state.hsbFinished||f.delta<0)){statusClass="safe";reserveStatus=state.hsbFinished||f.safeReason==="HSB finish"?"Safe — HSB finished":"Safe — latest call passed";countdown="Safe since "+fmt(state.hsbFinished?state.hsbEnd:f.safeAfter);rowClass="row-safe"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=30){statusClass="red";reserveStatus="Last chance";rowClass="row-critical"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=60){statusClass="amber";reserveStatus=f.safeReason==="HSB finish"?"Last chance — HSB ending":"Last chance"}const delay=f.fs.departure&&f.fs.departure.delay!=null?f.fs.departure.delay+"m":"";const fsText=shortStatus(f.fs)+(delay?" +"+delay:"");const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight);const tr=document.createElement("tr");tr.className=rowClass;tr.innerHTML="<td><strong>"+f.flight+"</strong></td><td>"+f.route+"</td><td>"+fmt(f.schedTO)+"</td><td>"+fmt(f.schedArr)+"</td><td>"+minToBlock(f.block)+"</td><td>"+fmt(f.latestTO)+"</td><td><span class='badge'>"+fmt(f.latestCall)+"</span></td><td><span class='badge'>"+fmt(f.safeAfter)+"</span><br><small>"+f.safeReason+"</small></td><td>"+fsText+"</td><td>"+countdown+"</td><td class='"+statusClass+"'>"+reserveStatus+"</td><td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";rowsEl.appendChild(tr)}}
 document.getElementById("parseBtn").addEventListener("click",parseAndRender);document.getElementById("statusBtn").addEventListener("click",refreshStatus);document.getElementById("hsbStart").addEventListener("input",render);document.getElementById("hsbEnd").addEventListener("input",render);const saved=localStorage.getItem(STORAGE_KEY);if(saved)document.getElementById("ficoInput").value=saved;parseAndRender();setInterval(render,10000);setInterval(refreshStatus,60000);
 </script></body></html>`;
 }
