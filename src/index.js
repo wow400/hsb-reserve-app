@@ -90,7 +90,7 @@ async function handleStatus(request, env) {
     };
   }
 
-  const response = jsonResponse({ ok: true, version: "v5", source: "aviationstack", updated: new Date().toISOString(), flights: results });
+  const response = jsonResponse({ ok: true, version: "v6", source: "aviationstack", updated: new Date().toISOString(), flights: results });
   response.headers.set("Cache-Control", "public, max-age=60");
   await cache.put(cacheKey, response.clone());
   return response;
@@ -109,15 +109,20 @@ function emptyFlight(flight) {
 function pickBestMatch(data, requestedFlight) {
   const matches = data.filter(item => normaliseFlight(item?.flight?.iata) === requestedFlight);
   if (!matches.length) return null;
+
   const today = new Date().toISOString().slice(0, 10);
-  const todayMatches = matches.filter(item => item.flight_date === today);
-  const candidates = todayMatches.length ? todayMatches : matches;
-  const statusRank = { active: 1, landed: 2, scheduled: 3, cancelled: 4, diverted: 5, incident: 6 };
+
+  // Critical fix: use today's departure record only.
+  // Do not fall back to yesterday, because overnight flights such as BA057 may show yesterday's landed sector.
+  const candidates = matches.filter(item => item.flight_date === today);
+  if (!candidates.length) return null;
+
+  const statusRank = { active: 1, scheduled: 2, landed: 3, cancelled: 4, diverted: 5, incident: 6 };
   return candidates.sort((a, b) => {
     const ra = statusRank[a.flight_status] || 99, rb = statusRank[b.flight_status] || 99;
     if (ra !== rb) return ra - rb;
     const ta = Date.parse(a?.departure?.scheduled || "") || 0, tb = Date.parse(b?.departure?.scheduled || "") || 0;
-    return tb - ta;
+    return ta - tb;
   })[0];
 }
 function classifyFlight(rawStatus, dep, arr, live) {
@@ -126,7 +131,7 @@ function classifyFlight(rawStatus, dep, arr, live) {
   if (rawStatus === "incident") return { status: "incident", label: "Incident", confidence: "uncertain", safe_by_status: false };
   if (rawStatus === "landed" || arr?.actual || arr?.actual_runway) return { status: "landed", label: "Landed", confidence: "confirmed", safe_by_status: true };
   if (dep?.actual || dep?.actual_runway || live) return { status: "departed", label: live ? "Airborne" : "Departed", confidence: "confirmed", safe_by_status: true };
-  if (rawStatus === "active") return { status: "awaiting_departure_confirmation", label: "Awaiting departure confirmation", confidence: "uncertain", safe_by_status: false };
+  if (rawStatus === "active") return { status: "awaiting_departure", label: "Awaiting departure", confidence: "uncertain", safe_by_status: false };
   if (rawStatus === "scheduled") {
     if (dep?.estimated && dep?.scheduled && dep.estimated !== dep.scheduled) return { status: "not_departed", label: "Delayed / estimated", confidence: "scheduled", safe_by_status: false };
     return { status: "not_departed", label: "Scheduled", confidence: "scheduled", safe_by_status: false };
@@ -157,7 +162,7 @@ h1{margin:0 0 6px;font-size:1.35rem}.sub{margin:0;color:var(--muted);font-size:.
 label{display:block;font-size:.8rem;font-weight:800;color:#333;margin:0 0 5px}
 input,textarea{width:100%;border:1px solid #ccd1d8;border-radius:12px;padding:12px 10px;font-size:1.05rem;background:#fff;color:var(--ink)}
 input{text-align:center}
-textarea{min-height:170px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86rem;line-height:1.35;resize:vertical}
+textarea{min-height:150px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86rem;line-height:1.35;resize:vertical}
 .clock{background:#111;color:#fff;border-radius:12px;padding:12px;font-weight:900;text-align:center;font-size:1.1rem}
 .summary{margin-top:12px;padding:12px;background:var(--soft);border-radius:12px;font-size:.9rem;line-height:1.4}
 .next{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff;font-size:.95rem}
@@ -171,13 +176,19 @@ textarea{min-height:170px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas
 button{border:0;border-radius:12px;padding:11px 14px;background:#111;color:#fff;font-weight:900;font-size:.95rem}
 button.secondary{background:#555}
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{width:100%;min-width:1040px;border-collapse:collapse;font-size:.88rem}
-th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;white-space:nowrap;vertical-align:top}
-th{background:#f8f9fb;font-weight:900;font-size:.78rem;color:#333}
+table{width:100%;min-width:1040px;border-collapse:collapse;font-size:.94rem}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;white-space:nowrap;vertical-align:top}
+th{background:#f8f9fb;font-weight:900;font-size:.82rem;color:#333}
 .badge{background:var(--call-bg);font-weight:900;border-radius:8px;display:inline-block;padding:4px 7px}
 .ok{color:var(--ok);font-weight:900}.amber{color:var(--amber);font-weight:900}.safe{color:#000;font-weight:900}.prestatus{color:#244e9b;font-weight:900}.bad{color:var(--bad);font-weight:900}.uncertain{color:#8a5a00;font-weight:900}.red{color:var(--red);font-weight:900}
 .row-safe{background:#e9f7ec;color:#000}.row-safe .badge{background:#fff;color:#000}.row-pre{background:#eef3ff}.row-departed{background:#f1f1f1}.row-uncertain{background:#fff7df}.row-critical{background:#ffe5e5}.row-live{background:#fffaf0}
-.status-link{display:inline-block;text-decoration:none;background:#111;color:#fff;padding:7px 9px;border-radius:9px;font-size:.78rem;font-weight:900}
+.dot{display:inline-block;width:18px;height:18px;border-radius:50%;margin-right:8px;vertical-align:-3px;box-shadow:inset 0 2px 3px rgba(255,255,255,.8), inset 0 -3px 5px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.25)}
+.dot-green{background:linear-gradient(#7dff7d,#0cad2a)}
+.dot-amber{background:linear-gradient(#ffd56a,#ff9800)}
+.dot-red{background:linear-gradient(#ff7777,#d60000)}
+.dot-blue{background:linear-gradient(#7db7ff,#1b64d8)}
+.dot-grey{background:linear-gradient(#eee,#aaa)}
+.status-link{display:inline-block;text-decoration:none;background:#111;color:#fff;padding:6px 9px;border-radius:9px;font-size:.8rem;font-weight:900}
 .note{color:var(--muted);font-size:.78rem;line-height:1.35;padding:12px 14px;border-top:1px solid var(--line);background:#fbfbfc}
 .parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
 @media(max-width:700px){.grid{grid-template-columns:1fr}.tile{grid-template-columns:1fr}.tile .remaining{text-align:left}table{font-size:.82rem;min-width:1040px}th,td{padding:8px 6px}.button-row{display:block}button{width:100%;margin-top:8px}}
@@ -186,8 +197,8 @@ th{background:#f8f9fb;font-weight:900;font-size:.78rem;color:#333}
 <body>
 <main class="app">
 <section class="card top">
-<h1>HSB Reserve App v5</h1>
-<p class="sub">Compact chronological table. Status refreshes automatically. Colours show reserve relevance.</p>
+<h1>HSB Reserve App v6</h1>
+<p class="sub">Compact chronological table. Status refreshes automatically. Coloured dots show reserve relevance.</p>
 <div class="grid">
 <div><label for="hsbStart">HSB start Z</label><input id="hsbStart" type="time" value="12:00"></div>
 <div><label for="hsbEnd">HSB finish Z</label><input id="hsbEnd" type="time" value="20:00"></div>
@@ -210,13 +221,13 @@ th{background:#f8f9fb;font-weight:900;font-size:.78rem;color:#333}
 <tbody id="rows"></tbody>
 </table>
 </div>
-<div class="note">v5 compact table. Rows stay chronological; colour shows safe/live/last-chance state.</div>
+<div class="note">v6 compact table. Rows stay chronological; colour dot and row colour show safe/live/last-chance state.</div>
 </section>
 </main>
 <script>
 let flights=[];let statuses={};let lastStatusUpdate=null;
 const HSB_TO_CHOCKS_LIMIT=1140,CALL_BEFORE_TAKEOFF=120;
-const STORAGE_KEY="hsb-reserve-fico-v5";
+const STORAGE_KEY="hsb-reserve-fico-v6";
 function toMin(t){const p=t.split(":").map(Number);return p[0]*60+p[1]}
 function compactToMin(s){s=String(s).replace(/\\D/g,"").padStart(4,"0");return Number(s.slice(0,2))*60+Number(s.slice(2,4))}
 function minToBlock(mins){mins=Math.abs(mins);return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0")}
@@ -235,12 +246,24 @@ function renderNextEvent(state,live){const el=document.getElementById("nextEvent
 function renderLiveBox(state,live){const aliveList=document.getElementById("aliveList");if(state.hsbNotStarted){aliveList.innerHTML="<div class='alive-title'>HSB not started yet</div><div class='tile pre'><div><strong>Standby starts at "+fmt(state.hsbStart)+"</strong></div><div class='call'>HSB finish "+fmt(state.hsbEnd)+"</div><div class='remaining'>starts in "+dur(state.hsbStartDelta)+"</div></div>";return}if(state.hsbFinished){aliveList.innerHTML="<div class='alive-title'>Still callable</div><div class='safe'>HSB finished — no further flights can be allocated.</div>";return}if(!live.length){aliveList.innerHTML="<div class='alive-title'>Still callable</div><div class='safe'>None remaining by time/status.</div>";return}aliveList.innerHTML="<div class='alive-title'>Still callable</div>"+live.map(f=>"<div class='tile "+(f.delta<=30?"critical":"live")+"'><div><strong>"+f.flight+" "+f.to+"</strong></div><div class='call'>Safe after "+fmt(f.safeAfter)+"</div><div class='remaining'>"+dur(f.delta)+"</div></div>").join("")}
 function shortStatus(fs){
   const label=fs.found?(fs.label||fs.status):"unknown";
-  if(label==="Awaiting departure confirmation")return"Unconfirmed";
+  if(label==="Awaiting departure confirmation")return"Awaiting departure";
+  if(label==="Awaiting departure")return"Awaiting departure";
   if(label==="Delayed / estimated")return"Delay";
-  if(label==="Scheduled")return"Sched";
+  if(label==="Scheduled")return"Scheduled";
   return label;
 }
-function renderTable(state){const rowsEl=document.getElementById("rows");rowsEl.innerHTML="";for(const f of state.rows){let statusClass="ok",reserveStatus="Live",countdown="in "+dur(f.delta),rowClass=state.hsbNotStarted?"row-pre":"row-live";if(state.hsbNotStarted){statusClass="prestatus";reserveStatus="HSB not started";countdown="HSB starts in "+dur(state.hsbStartDelta);rowClass="row-pre"}if(f.fs.safe_by_status){statusClass="safe";reserveStatus="Safe — "+(f.fs.label||f.fs.status);countdown=f.fs.label||"Safe";rowClass="row-safe row-departed"}else if(f.fs.confidence==="uncertain"){statusClass="uncertain";if(!state.hsbNotStarted)rowClass="row-uncertain"}if(!f.fs.safe_by_status&&(state.hsbFinished||f.delta<0)){statusClass="safe";reserveStatus=state.hsbFinished||f.safeReason==="HSB finish"?"Safe — HSB finished":"Safe — latest call passed";countdown="Safe since "+fmt(state.hsbFinished?state.hsbEnd:f.safeAfter);rowClass="row-safe"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=30){statusClass="red";reserveStatus="Last chance";rowClass="row-critical"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=60){statusClass="amber";reserveStatus=f.safeReason==="HSB finish"?"Last chance — HSB ending":"Last chance"}const delay=f.fs.departure&&f.fs.departure.delay!=null?f.fs.departure.delay+"m":"";const fsText=shortStatus(f.fs)+(delay?" +"+delay:"");const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight);const tr=document.createElement("tr");tr.className=rowClass;tr.innerHTML="<td><strong>"+f.flight+"</strong></td><td>"+f.route+"</td><td>"+fmt(f.schedTO)+"</td><td>"+fmt(f.schedArr)+"</td><td>"+minToBlock(f.block)+"</td><td>"+fmt(f.latestTO)+"</td><td><span class='badge'>"+fmt(f.latestCall)+"</span></td><td><span class='badge'>"+fmt(f.safeAfter)+"</span><br><small>"+f.safeReason+"</small></td><td>"+fsText+"</td><td>"+countdown+"</td><td class='"+statusClass+"'>"+reserveStatus+"</td><td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";rowsEl.appendChild(tr)}}
+
+function dotClassFor(f,state){
+  if(state.hsbNotStarted) return "dot-blue";
+  if(f.fs.safe_by_status) return "dot-green";
+  if(state.hsbFinished || f.delta < 0) return "dot-green";
+  if(!f.fs.found) return "dot-grey";
+  if(f.delta <= 30) return "dot-red";
+  if(f.fs.confidence === "uncertain") return "dot-amber";
+  return "dot-amber";
+}
+
+function renderTable(state){const rowsEl=document.getElementById("rows");rowsEl.innerHTML="";for(const f of state.rows){let statusClass="ok",reserveStatus="Live",countdown="in "+dur(f.delta),rowClass=state.hsbNotStarted?"row-pre":"row-live";if(state.hsbNotStarted){statusClass="prestatus";reserveStatus="HSB not started";countdown="HSB starts in "+dur(state.hsbStartDelta);rowClass="row-pre"}if(f.fs.safe_by_status){statusClass="safe";reserveStatus="Safe — "+(f.fs.label||f.fs.status);countdown=f.fs.label||"Safe";rowClass="row-safe row-departed"}else if(f.fs.confidence==="uncertain"){statusClass="uncertain";if(!state.hsbNotStarted)rowClass="row-uncertain"}if(!f.fs.safe_by_status&&(state.hsbFinished||f.delta<0)){statusClass="safe";reserveStatus=state.hsbFinished||f.safeReason==="HSB finish"?"Safe — HSB finished":"Safe — latest call passed";countdown="Safe since "+fmt(state.hsbFinished?state.hsbEnd:f.safeAfter);rowClass="row-safe"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=30){statusClass="red";reserveStatus="Last chance";rowClass="row-critical"}else if(!f.fs.safe_by_status&&!state.hsbNotStarted&&f.delta<=60){statusClass="amber";reserveStatus=f.safeReason==="HSB finish"?"Last chance — HSB ending":"Last chance"}const delay=f.fs.departure&&f.fs.departure.delay!=null?f.fs.departure.delay+"m":"";const fsText=shortStatus(f.fs)+(delay?" +"+delay:"");const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight);const tr=document.createElement("tr");tr.className=rowClass;tr.innerHTML="<td><span class=\"dot "+dotClassFor(f,state)+"\"></span><strong>"+f.flight+"</strong></td><td>"+f.route+"</td><td>"+fmt(f.schedTO)+"</td><td>"+fmt(f.schedArr)+"</td><td>"+minToBlock(f.block)+"</td><td>"+fmt(f.latestTO)+"</td><td><span class='badge'>"+fmt(f.latestCall)+"</span></td><td><span class='badge'>"+fmt(f.safeAfter)+"</span><br><small>"+f.safeReason+"</small></td><td>"+fsText+"</td><td>"+countdown+"</td><td class='"+statusClass+"'>"+reserveStatus+"</td><td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";rowsEl.appendChild(tr)}}
 document.getElementById("parseBtn").addEventListener("click",parseAndRender);document.getElementById("statusBtn").addEventListener("click",refreshStatus);document.getElementById("hsbStart").addEventListener("input",render);document.getElementById("hsbEnd").addEventListener("input",render);const saved=localStorage.getItem(STORAGE_KEY);if(saved)document.getElementById("ficoInput").value=saved;parseAndRender();setInterval(render,10000);setInterval(refreshStatus,60000);
 </script></body></html>`;
 }
