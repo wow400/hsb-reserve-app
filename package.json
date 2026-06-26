@@ -1,7 +1,11 @@
 {
-  "name":"hsb-reserve-app",
-  "version":"2.0.0",
-  "private":true,
-  "scripts":{"deploy":"wrangler deploy"},
-  "devDependencies":{"wrangler":"^3.0.0"}
+  "name": "hsb-reserve-app",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
 }
