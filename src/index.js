@@ -134,7 +134,7 @@ async function handleStatus(request, env) {
 
   const response = jsonResponse({
     ok: true,
-    version: "v8",
+    version: "v9",
     source: "aviationstack",
     updated: new Date().toISOString(),
     flights: results
@@ -241,6 +241,12 @@ function classifyFlight(rawStatus, dep, arr, live) {
   const estimatedLater = scheduled && estimated ? estimated > scheduled : false;
 
   if (rawStatus === "active") {
+    const ninetyMinutesAfterSTD = scheduled ? now > scheduled + 90 * 60 * 1000 : false;
+
+    if (ninetyMinutesAfterSTD) {
+      return { status: "departed", label: "Departed", confidence: "inferred", safe_by_status: true };
+    }
+
     return pastSTD
       ? { status: "delayed", label: "Delayed", confidence: "uncertain", safe_by_status: false }
       : { status: "planned", label: "Planned", confidence: "scheduled", safe_by_status: false };
@@ -510,8 +516,8 @@ td{color:#eef3f8}
 <main class="app">
 <section class="header">
   <div>
-    <h1>HSB Reserve App <span class="version">v8</span></h1>
-    <p class="sub">All times in Zulu (Z). Primary view shows flights you could still be called for.</p>
+    <h1>HSB Reserve App <span class="version">v9</span></h1>
+    <p class="sub">All times in Zulu (Z). Chronological reserve table.</p>
   </div>
   <div class="controls">
     <div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div>
@@ -519,10 +525,6 @@ td{color:#eef3f8}
     <div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div>
   </div>
 </section>
-
-<section class="card top-callable" id="aliveList"></section>
-
-<section class="stats" id="stats"></section>
 
 <section class="card fico">
   <div class="fico-grid">
@@ -576,7 +578,7 @@ let lastStatusUpdate = null;
 
 const HSB_TO_CHOCKS_LIMIT = 1140;
 const CALL_BEFORE_TAKEOFF = 120;
-const STORAGE_KEY = "hsb-reserve-fico-v8";
+const STORAGE_KEY = "hsb-reserve-fico-v9";
 
 function toMin(t) {
   const p = t.split(":").map(Number);
@@ -803,8 +805,6 @@ function render() {
   const state = computeRows();
   if (!state) return;
 
-  renderCallable(state);
-  renderStats(state);
   renderTable(state);
 }
 
