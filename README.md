@@ -1,12 +1,13 @@
-# HSB Reserve App v5
+# HSB Reserve App v6
 
 Single Cloudflare Worker application.
 
-v5 changes:
-- Compact table width for iPad.
-- Removed Reg, Confidence, and Latest on-blocks columns.
-- Shorter flight-status labels.
-- Better row colouring while keeping chronological order.
+v6 changes:
+- Full "Scheduled" wording.
+- Prevents yesterday's landed overnight flight being used for today's BA057/BA055.
+- Active without departure evidence shows Awaiting departure, not safe.
+- Adds coloured 3D-style status dots.
+- Tightens table row spacing and slightly increases table text size.
 
 Required Cloudflare secret:
 
