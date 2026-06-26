@@ -1,12 +1,13 @@
-# HSB Reserve App v3
+# HSB Reserve App v4
 
 Single Cloudflare Worker application.
 
-v3 changes:
-- BA055/BA057 fallback to BA55/BA57.
-- Active alone is no longer treated as airborne.
-- Adds aircraft registration display.
-- Adds confidence and clearer safe-by-status logic.
+v4 changes:
+- Keeps table chronological by scheduled take-off.
+- Adds next relevant event banner.
+- Top box shows still-callable flights.
+- Better operational colours.
+- Keeps v3 flight-status safeguards.
 
 Required Cloudflare secret:
 
