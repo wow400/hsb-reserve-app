@@ -129,7 +129,7 @@ async function handleStatus(request, env) {
 
   const response = jsonResponse({
     ok: true,
-    version: "v6.1",
+    version: "v7",
     source: "aviationstack",
     updated: new Date().toISOString(),
     flights: results
@@ -204,39 +204,33 @@ function pickBestMatch(data, requestedFlight) {
 }
 
 function classifyFlight(rawStatus, dep, arr, live) {
-  if (rawStatus === "cancelled") {
-    return { status: "cancelled", label: "Cancelled", confidence: "confirmed", safe_by_status: true };
-  }
-
-  if (rawStatus === "diverted") {
-    return { status: "diverted", label: "Diverted", confidence: "confirmed", safe_by_status: true };
-  }
-
-  if (rawStatus === "incident") {
-    return { status: "incident", label: "Incident", confidence: "uncertain", safe_by_status: false };
-  }
-
-  if (rawStatus === "landed" || arr?.actual || arr?.actual_runway) {
-    return { status: "landed", label: "Landed", confidence: "confirmed", safe_by_status: true };
-  }
+  if (rawStatus === "cancelled") return { status: "cancelled", label: "Cancelled", confidence: "confirmed", safe_by_status: true };
+  if (rawStatus === "diverted") return { status: "diverted", label: "Diverted", confidence: "confirmed", safe_by_status: true };
+  if (rawStatus === "incident") return { status: "incident", label: "Unknown", confidence: "uncertain", safe_by_status: false };
+  if (rawStatus === "landed" || arr?.actual || arr?.actual_runway) return { status: "landed", label: "Departed", confidence: "confirmed", safe_by_status: true };
 
   const hasDepartureEvidence = Boolean(dep?.actual || dep?.actual_runway || live);
-  if (hasDepartureEvidence) {
-    return { status: "departed", label: live ? "Airborne" : "Departed", confidence: "confirmed", safe_by_status: true };
-  }
+  if (hasDepartureEvidence) return { status: "departed", label: "Departed", confidence: "confirmed", safe_by_status: true };
+
+  const now = Date.now();
+  const scheduled = dep?.scheduled ? Date.parse(dep.scheduled) : null;
+  const estimated = dep?.estimated ? Date.parse(dep.estimated) : null;
+  const pastSTD = scheduled ? now > scheduled : false;
+  const estimatedLater = scheduled && estimated ? estimated > scheduled : false;
 
   if (rawStatus === "active") {
-    return { status: "awaiting_departure", label: "Awaiting departure", confidence: "uncertain", safe_by_status: false };
+    return pastSTD
+      ? { status: "delayed", label: "Delayed", confidence: "uncertain", safe_by_status: false }
+      : { status: "planned", label: "Planned", confidence: "scheduled", safe_by_status: false };
   }
 
   if (rawStatus === "scheduled") {
-    if (dep?.estimated && dep?.scheduled && dep.estimated !== dep.scheduled) {
-      return { status: "not_departed", label: "Delayed", confidence: "scheduled", safe_by_status: false };
-    }
-    return { status: "not_departed", label: "Scheduled", confidence: "scheduled", safe_by_status: false };
+    return (pastSTD || estimatedLater)
+      ? { status: "delayed", label: "Delayed", confidence: "scheduled", safe_by_status: false }
+      : { status: "planned", label: "Planned", confidence: "scheduled", safe_by_status: false };
   }
 
-  return { status: rawStatus || "unknown", label: rawStatus || "Unknown", confidence: "unknown", safe_by_status: false };
+  return { status: rawStatus || "unknown", label: "Unknown", confidence: "unknown", safe_by_status: false };
 }
 
 function jsonResponse(body, status = 200) {
@@ -261,544 +255,98 @@ function appHtml() {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>HSB Reserve App</title>
 <style>
-:root{
-  --bg:#f3f4f6;
-  --card:#fff;
-  --ink:#111;
-  --muted:#555;
-  --line:#e1e4e8;
-  --soft:#f0f3f7;
-  --green-row:#e9f7ec;
-  --amber-row:#fff7df;
-  --red-row:#ffe5e5;
-  --blue-row:#eef3ff;
-  --grey-row:#f1f1f1;
-  --call-bg:#fff4ce;
-  --green:#0a6b28;
-  --amber:#8a5a00;
-  --red:#b00020;
-  --blue:#1b64d8;
-}
+:root{--bg:#05080c;--panel:#0b1118;--ink:#f4f7fb;--muted:#a8b0bb;--line:#26313c;--blue:#58a6ff;--green:#41d45a;--amber:#ffc400;--red:#ff4b4b;--grey:#aeb6bf}
 *{box-sizing:border-box}
-body{
-  margin:0;
-  padding:10px;
-  background:var(--bg);
-  color:var(--ink);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-}
-.app{max-width:1340px;margin:0 auto;padding:12px 0 18px}
-.card{
-  background:var(--card);
-  border-radius:18px;
-  box-shadow:0 2px 12px rgba(0,0,0,.08);
-  overflow:hidden;
-}
-.top,.fico{padding:16px;margin-bottom:12px}
-h1{margin:0 0 6px;font-size:1.42rem}
-.sub{margin:0;color:var(--muted);font-size:.96rem;line-height:1.35}
-.grid{
-  display:grid;
-  grid-template-columns:minmax(140px,220px) minmax(140px,220px) 1fr;
-  gap:12px;
-  align-items:end;
-  margin-top:14px;
-}
-label{display:block;font-size:.82rem;font-weight:800;color:#333;margin:0 0 5px}
-input,textarea{
-  width:100%;
-  border:1px solid #ccd1d8;
-  border-radius:12px;
-  padding:11px 10px;
-  font-size:1.05rem;
-  background:#fff;
-  color:var(--ink);
-}
-input{text-align:center}
-textarea{
-  min-height:145px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  font-size:.9rem;
-  line-height:1.28;
-  resize:vertical;
-}
-.clock{
-  background:#111;
-  color:#fff;
-  border-radius:12px;
-  padding:12px;
-  font-weight:900;
-  text-align:center;
-  font-size:1.1rem;
-}
-.summary{
-  margin-top:12px;
-  padding:11px 12px;
-  background:var(--soft);
-  border-radius:12px;
-  font-size:.92rem;
-  line-height:1.36;
-}
-.next{
-  margin-top:12px;
-  padding:12px 14px;
-  border:1px solid var(--line);
-  border-radius:14px;
-  background:#fff;
-  font-size:.96rem;
-}
-.next-title{font-weight:900;margin-bottom:4px}
-.next-strong{font-weight:900}
-.alive{
-  margin-top:12px;
-  padding:11px 12px;
-  background:#f8f9fb;
-  border:1px solid var(--line);
-  border-radius:12px;
-  font-size:.94rem;
-  line-height:1.38;
-}
-.alive-title{font-weight:900;margin-bottom:6px}
-.tile{
-  display:grid;
-  grid-template-columns:1.2fr 1fr 1fr;
-  gap:8px;
-  align-items:center;
-  margin:5px 0;
-  padding:8px 10px;
-  border-radius:12px;
-  border:1px solid var(--line);
-}
-.tile.live{background:var(--amber-row)}
-.tile.critical{background:var(--red-row)}
-.tile.pre{background:var(--blue-row)}
-.tile .call{font-weight:900}
-.tile .remaining{font-weight:900;text-align:right}
-.button-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-button{
-  border:0;
-  border-radius:12px;
-  padding:10px 14px;
-  background:#111;
-  color:#fff;
-  font-weight:900;
-  font-size:.95rem;
-}
-button.secondary{background:#555}
-.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{
-  width:100%;
-  min-width:1040px;
-  border-collapse:collapse;
-  font-size:.94rem;
-}
-th,td{
-  border-bottom:1px solid var(--line);
-  padding:7px 8px;
-  text-align:left;
-  white-space:nowrap;
-  vertical-align:middle;
-}
-th{
-  background:#f8f9fb;
-  font-weight:900;
-  font-size:.82rem;
-  color:#333;
-}
-.badge{
-  background:var(--call-bg);
-  font-weight:900;
-  border-radius:8px;
-  display:inline-block;
-  padding:4px 7px;
-}
-.ok{color:var(--green);font-weight:900}
-.amber{color:var(--amber);font-weight:900}
-.safe{color:#000;font-weight:900}
-.prestatus{color:var(--blue);font-weight:900}
-.red{color:var(--red);font-weight:900}
-.uncertain{color:var(--amber);font-weight:900}
-.row-safe{background:var(--green-row)}
-.row-safe .badge{background:#fff;color:#000}
-.row-pre{background:var(--blue-row)}
-.row-departed{background:var(--grey-row)}
-.row-uncertain{background:var(--amber-row)}
-.row-critical{background:var(--red-row)}
-.row-live{background:var(--amber-row)}
-.dot{
-  display:inline-block;
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  margin-right:8px;
-  vertical-align:-3px;
-  box-shadow:inset 0 2px 3px rgba(255,255,255,.85), inset 0 -3px 5px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.25);
-}
-.dot-green{background:linear-gradient(#83ff83,#0cad2a)}
-.dot-amber{background:linear-gradient(#ffd56a,#ff9800)}
-.dot-red{background:linear-gradient(#ff7777,#d60000)}
-.dot-blue{background:linear-gradient(#7db7ff,#1b64d8)}
-.dot-grey{background:linear-gradient(#eee,#aaa)}
-.status-link{
-  display:inline-block;
-  text-decoration:none;
-  background:#111;
-  color:#fff;
-  padding:6px 9px;
-  border-radius:9px;
-  font-size:.8rem;
-  font-weight:900;
-}
-.note{
-  color:var(--muted);
-  font-size:.8rem;
-  line-height:1.35;
-  padding:10px 14px;
-  border-top:1px solid var(--line);
-  background:#fbfbfc;
-}
-.parse-note{
-  margin-top:8px;
-  color:var(--muted);
-  font-size:.82rem;
-  line-height:1.35;
-}
-@media(max-width:700px){
-  .grid{grid-template-columns:1fr}
-  .tile{grid-template-columns:1fr}
-  .tile .remaining{text-align:left}
-  table{font-size:.88rem;min-width:1040px}
-  th,td{padding:7px 6px}
-  .button-row{display:block}
-  button{width:100%;margin-top:8px}
-}
+body{margin:0;padding:14px;background:radial-gradient(circle at top,#101923 0,#05080c 45%,#030507 100%);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.app{max-width:1220px;margin:0 auto;padding:8px 0 24px}
+.header{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;margin-bottom:12px}
+h1{margin:0;font-size:1.65rem;letter-spacing:-.03em}.version{font-size:.78rem;background:#102742;color:#80bdff;border:1px solid #1e4774;border-radius:8px;padding:4px 7px;margin-left:8px;vertical-align:4px}.sub{margin:6px 0 0;color:var(--muted);font-size:.95rem}
+.controls{display:grid;grid-template-columns:120px 120px 140px;gap:8px}.control{background:linear-gradient(#101923,#0a1017);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.control label{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase;margin-bottom:4px}.control input{width:100%;border:0;background:transparent;color:var(--blue);font-weight:900;font-size:1.18rem;text-align:center}.clock{font-weight:900;font-size:1.28rem;color:#fff}
+.card{background:rgba(11,17,24,.94);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.28);overflow:hidden;margin-bottom:12px}
+.top-callable{border-color:rgba(255,196,0,.65);padding:14px 16px}.callable-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px;color:var(--amber);font-weight:900;font-size:1.35rem}.callable-sub{color:var(--muted);font-size:.9rem;font-weight:500}.callable-row{display:grid;grid-template-columns:28px 110px 80px 1fr 110px;gap:12px;align-items:center;padding:10px 0;border-top:1px solid rgba(255,255,255,.08);font-size:1.1rem}.callable-row:first-of-type{border-top:0}.callable-flight{font-weight:900}.callable-call{color:var(--amber);font-weight:900}.callable-time{color:var(--amber);font-weight:900;text-align:right}.empty-callable{padding:10px 0;color:var(--green);font-weight:900}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.stat{background:linear-gradient(#0d141d,#080d13);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;min-height:84px}.stat .num{font-size:1.8rem;font-weight:900;margin-top:4px}.stat .lbl{font-size:.76rem;text-transform:uppercase;font-weight:900;color:var(--muted);line-height:1.25}.stat.safe{border-color:rgba(65,212,90,.45)}.stat.safe .num,.stat.safe .lbl{color:var(--green)}.stat.callable{border-color:rgba(255,196,0,.45)}.stat.callable .num,.stat.callable .lbl{color:var(--amber)}.stat.action{border-color:rgba(255,75,75,.45)}.stat.action .num,.stat.action .lbl{color:var(--red)}.stat.blue{border-color:rgba(88,166,255,.45)}.stat.blue .num,.stat.blue .lbl{color:var(--blue)}.stat.unknown .num,.stat.unknown .lbl{color:var(--grey)}
+.fico{padding:14px 16px}.fico-grid{display:grid;grid-template-columns:1fr 210px;gap:14px}.fico label{display:block;color:var(--ink);font-weight:900;font-size:.82rem;margin-bottom:6px}textarea{width:100%;min-height:130px;background:#f9fbff;color:#111;border:1px solid #cfd7e2;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.25}.button-col{display:flex;flex-direction:column;gap:10px;justify-content:flex-start}button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}table{width:100%;min-width:930px;border-collapse:collapse;font-size:.95rem}th,td{border-bottom:1px solid var(--line);padding:8px 8px;text-align:left;white-space:nowrap;vertical-align:middle}th{background:#111922;color:#c9d1d9;font-size:.78rem;font-weight:900}td{color:#eef3f8}.badge{font-weight:900;border-radius:8px;display:inline-block;padding:3px 7px}.badge-green{background:rgba(65,212,90,.14);color:var(--green)}.badge-amber{background:rgba(255,196,0,.14);color:var(--amber)}
+.small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}.status-planned{color:var(--green);font-weight:900}.status-delayed,.status-live{color:var(--amber);font-weight:900}.status-safe{color:var(--green);font-weight:900}.status-unknown{color:var(--grey);font-weight:900}.row-safe{background:rgba(65,212,90,.06)}.row-pre{background:rgba(88,166,255,.07)}.row-live{background:rgba(255,196,0,.06)}.row-critical{background:rgba(255,75,75,.12)}.row-departed{background:rgba(255,255,255,.035)}
+.dot{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:-4px;box-shadow:inset 0 2px 3px rgba(255,255,255,.85),inset 0 -3px 5px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.5)}.dot-green{background:linear-gradient(#83ff83,#0cad2a)}.dot-amber{background:linear-gradient(#ffd56a,#ff9800)}.dot-red{background:linear-gradient(#ff7777,#d60000)}.dot-blue{background:linear-gradient(#7db7ff,#1b64d8)}.dot-grey{background:linear-gradient(#eee,#9aa3ad)}
+.status-link{display:inline-block;text-decoration:none;background:#05080c;color:#58a6ff;border:1px solid #244b78;padding:6px 9px;border-radius:8px;font-size:.8rem;font-weight:900}.legend{display:flex;gap:18px;flex-wrap:wrap;padding:11px 14px;color:#c9d1d9;font-size:.88rem}.legend span{display:inline-flex;gap:7px;align-items:center}.note{padding:12px 14px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line)}
+@media(max-width:800px){.header{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr 1fr}.stats{grid-template-columns:repeat(2,1fr)}.fico-grid{grid-template-columns:1fr}.callable-row{grid-template-columns:26px 90px 60px 1fr 90px;font-size:1rem}table{font-size:.9rem;min-width:900px}}
 </style>
 </head>
 <body>
 <main class="app">
-<section class="card top">
-<h1>HSB Reserve App v6.1</h1>
-<p class="sub">Compact chronological table. Status refreshes automatically. Coloured dots show reserve relevance.</p>
-<div class="grid">
-<div><label for="hsbStart">HSB start Z</label><input id="hsbStart" type="time" value="12:00"></div>
-<div><label for="hsbEnd">HSB finish Z</label><input id="hsbEnd" type="time" value="20:00"></div>
-<div class="clock" id="utcClock">UTC ----Z</div>
-</div>
-<div id="summary" class="summary"></div>
-<div id="nextEvent" class="next"></div>
-<div id="aliveList" class="alive"></div>
+<section class="header">
+  <div>
+    <h1>HSB Reserve App <span class="version">v7</span></h1>
+    <p class="sub">All times in Zulu (Z). Primary view shows flights you could still be called for.</p>
+  </div>
+  <div class="controls">
+    <div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div>
+    <div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div>
+    <div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div>
+  </div>
 </section>
-
+<section class="card top-callable" id="aliveList"></section>
+<section class="stats" id="stats"></section>
 <section class="card fico">
-<label for="ficoInput">Paste BA/FICO flight list</label>
-<textarea id="ficoInput" spellcheck="false">${escapedFico}</textarea>
-<div class="button-row">
-<button id="parseBtn">Parse FICO list</button>
-<button id="statusBtn" class="secondary">Refresh flight status</button>
-</div>
-<div id="parseNote" class="parse-note">Tomorrow rows such as 207/27 are ignored.</div>
+  <div class="fico-grid">
+    <div>
+      <label for="ficoInput">Paste BA/FICO flight list</label>
+      <textarea id="ficoInput" spellcheck="false">${escapedFico}</textarea>
+    </div>
+    <div class="button-col">
+      <button class="primary" id="parseBtn">Parse FICO list</button>
+      <button id="statusBtn">Refresh flight status</button>
+      <div id="parseNote" class="parse-note">Tomorrow rows such as 207/27 are ignored.</div>
+    </div>
+  </div>
 </section>
-
 <section class="card">
-<div class="table-scroll">
-<table>
-<thead>
-<tr>
-<th>Flight</th>
-<th>Route</th>
-<th>T/O</th>
-<th>Arr</th>
-<th>Block</th>
-<th>Latest T/O</th>
-<th>Call</th>
-<th>Safe</th>
-<th>Status</th>
-<th>Countdown</th>
-<th>Reserve</th>
-<th>Google</th>
-</tr>
-</thead>
-<tbody id="rows"></tbody>
-</table>
-</div>
-<div class="note">v6.1: rows remain chronological. Colour dot and row colour show safe/live/last-chance state.</div>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Google</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="legend">
+    <span><i class="dot dot-green"></i> Safe</span>
+    <span><i class="dot dot-amber"></i> Still callable</span>
+    <span><i class="dot dot-red"></i> Action required</span>
+    <span><i class="dot dot-blue"></i> HSB not started</span>
+    <span><i class="dot dot-grey"></i> Unknown</span>
+  </div>
+  <div class="note">Call by = earlier of latest legal call time or HSB finish. Rows remain chronological by scheduled take-off.</div>
 </section>
 </main>
 
 <script>
-let flights=[];
-let statuses={};
-let lastStatusUpdate=null;
-
-const HSB_TO_CHOCKS_LIMIT=1140;
-const CALL_BEFORE_TAKEOFF=120;
-const STORAGE_KEY="hsb-reserve-fico-v6-1";
-
-function toMin(t){
-  const p=t.split(":").map(Number);
-  return p[0]*60+p[1];
-}
-function compactToMin(s){
-  s=String(s).replace(/\\D/g,"").padStart(4,"0");
-  return Number(s.slice(0,2))*60+Number(s.slice(2,4));
-}
-function minToBlock(mins){
-  mins=Math.abs(mins);
-  return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
-}
-function fmt(mins){
-  const plus=mins>=1440?" +1":"";
-  mins=((mins%1440)+1440)%1440;
-  return String(Math.floor(mins/60)).padStart(2,"0")+String(mins%60).padStart(2,"0")+"Z"+plus;
-}
-function dur(mins){
-  mins=Math.max(0,Math.abs(mins));
-  return Math.floor(mins/60)+"h"+String(mins%60).padStart(2,"0")+"m";
-}
-function utcNowMinutes(){
-  const d=new Date();
-  return d.getUTCHours()*60+d.getUTCMinutes();
-}
-function utcNowText(){
-  const d=new Date();
-  return String(d.getUTCHours()).padStart(2,"0")+String(d.getUTCMinutes()).padStart(2,"0")+"Z";
-}
-function futureDelta(targetMins,nowMins){
-  let target=targetMins;
-  while(target<nowMins-720) target+=1440;
-  return target-nowMins;
-}
-function normaliseEnd(start,end){
-  return end<=start?end+1440:end;
-}
-function parseFico(text){
-  const parsed=[];
-  for(const rawLine of text.split(/\\n/)){
-    const line=rawLine.trim();
-    if(line.match(/^\\d{3}\\/\\d{1,2}/)) continue;
-
-    const m=line.match(/^(\\d{3})\\s+([A-Z]{3})-([A-Z]{3})\\s+(\\d{4})\\S*\\s+\\S+\\s+\\S+\\s+(\\d{4})/);
-    if(!m) continue;
-
-    const [,num,from,to,ptd,pta]=m;
-    const schedTO=compactToMin(ptd);
-    let schedArr=compactToMin(pta);
-    if(schedArr<=schedTO) schedArr+=1440;
-
-    parsed.push({
-      flight:"BA"+num,
-      from,
-      to,
-      route:from+"-"+to,
-      schedTO,
-      schedArr,
-      block:schedArr-schedTO
-    });
-  }
-  return parsed.sort((a,b)=>a.schedTO-b.schedTO);
-}
-async function refreshStatus(){
-  if(!flights.length) return;
-  const query=flights.map(f=>f.flight).join(",");
-  try{
-    const res=await fetch("/api/status?flights="+encodeURIComponent(query));
-    const data=await res.json();
-
-    if(data.ok&&data.flights){
-      statuses=data.flights;
-      lastStatusUpdate=new Date(data.updated);
-      document.getElementById("parseNote").textContent="Flight status updated: "+lastStatusUpdate.toUTCString();
-    }else{
-      document.getElementById("parseNote").textContent="Flight status error: "+(data.error||"unknown");
-    }
-  }catch(e){
-    document.getElementById("parseNote").textContent="Flight status fetch failed: "+e;
-  }
-  render();
-}
-function parseAndRender(){
-  const text=document.getElementById("ficoInput").value;
-  localStorage.setItem(STORAGE_KEY,text);
-  flights=parseFico(text);
-  statuses={};
-  document.getElementById("parseNote").textContent="Parsed "+flights.length+" flights. Tomorrow rows ignored.";
-  render();
-  refreshStatus();
-}
-function computeRows(){
-  const startInput=document.getElementById("hsbStart").value;
-  const endInput=document.getElementById("hsbEnd").value;
-  if(!startInput||!endInput) return null;
-
-  const hsbStart=toMin(startInput);
-  const hsbEnd=normaliseEnd(hsbStart,toMin(endInput));
-  const latestOnBlocks=hsbStart+HSB_TO_CHOCKS_LIMIT;
-  const now=utcNowMinutes();
-
-  const hsbStartDelta=futureDelta(hsbStart,now);
-  const hsbFinishDelta=futureDelta(hsbEnd,now);
-  const hsbNotStarted=hsbStartDelta>0&&hsbStartDelta<720;
-  const hsbFinished=hsbFinishDelta<0;
-
-  const rows=flights.map(f=>{
-    const latestTO=latestOnBlocks-f.block;
-    const latestCall=latestTO-CALL_BEFORE_TAKEOFF;
-    const safeAfter=Math.min(latestCall,hsbEnd);
-    const delta=futureDelta(safeAfter,now);
-    const safeReason=hsbEnd<latestCall?"HSB finish":"Latest call";
-    const fs=statuses[f.flight]||{
-      status:"unknown",
-      found:false,
-      label:"Unknown",
-      confidence:"none",
-      safe_by_status:false
-    };
-
-    return {...f,latestOnBlocks,latestTO,latestCall,safeAfter,delta,safeReason,fs};
-  });
-
-  return {rows,hsbStart,hsbEnd,latestOnBlocks,now,hsbStartDelta,hsbFinishDelta,hsbNotStarted,hsbFinished};
-}
-function render(){
-  document.getElementById("utcClock").textContent="UTC "+utcNowText();
-
-  const state=computeRows();
-  if(!state) return;
-
-  const statusAge=lastStatusUpdate
-    ? Math.max(0,Math.round((Date.now()-lastStatusUpdate.getTime())/1000))+"s ago"
-    : "not yet updated";
-
-  document.getElementById("summary").innerHTML=
-    "<strong>HSB:</strong> "+fmt(state.hsbStart)+"–"+fmt(state.hsbEnd)+
-    "<br><strong>Latest on-blocks:</strong> "+fmt(state.latestOnBlocks)+
-    "<br><strong>Flights parsed:</strong> "+flights.length+
-    "<br><strong>Status updated:</strong> "+statusAge+
-    "<br><strong>Rule:</strong> Safe after the earlier of latest call, HSB finish, confirmed departure/landing, cancellation or diversion.";
-
-  const live=state.rows.filter(f=>!state.hsbNotStarted&&!state.hsbFinished&&f.delta>=0&&!f.fs.safe_by_status);
-
-  renderNextEvent(state,live);
-  renderLiveBox(state,live);
-  renderTable(state);
-}
-function renderNextEvent(state,live){
-  const el=document.getElementById("nextEvent");
-
-  if(state.hsbNotStarted){
-    el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>HSB starts at "+fmt(state.hsbStart)+"</span> — in "+dur(state.hsbStartDelta);
-    return;
-  }
-  if(state.hsbFinished){
-    el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>HSB finished</span> — no further flights can be allocated.";
-    return;
-  }
-  if(!live.length){
-    el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>None</span> — no flights remain live by time/status.";
-    return;
-  }
-
-  const next=live.slice().sort((a,b)=>a.delta-b.delta)[0];
-  el.innerHTML="<div class='next-title'>Next relevant event</div><span class='next-strong'>"+next.flight+" "+next.to+" safe after "+fmt(next.safeAfter)+"</span> — in "+dur(next.delta)+" ("+next.safeReason+")";
-}
-function renderLiveBox(state,live){
-  const aliveList=document.getElementById("aliveList");
-
-  if(state.hsbNotStarted){
-    aliveList.innerHTML="<div class='alive-title'>HSB not started yet</div><div class='tile pre'><div><strong>Standby starts at "+fmt(state.hsbStart)+"</strong></div><div class='call'>HSB finish "+fmt(state.hsbEnd)+"</div><div class='remaining'>starts in "+dur(state.hsbStartDelta)+"</div></div>";
-    return;
-  }
-  if(state.hsbFinished){
-    aliveList.innerHTML="<div class='alive-title'>Still callable</div><div class='safe'>HSB finished — no further flights can be allocated.</div>";
-    return;
-  }
-  if(!live.length){
-    aliveList.innerHTML="<div class='alive-title'>Still callable</div><div class='safe'>None remaining by time/status.</div>";
-    return;
-  }
-
-  aliveList.innerHTML="<div class='alive-title'>Still callable</div>"+live.map(f=>
-    "<div class='tile "+(f.delta<=30?"critical":"live")+"'><div><strong>"+f.flight+" "+f.to+"</strong></div><div class='call'>Safe after "+fmt(f.safeAfter)+"</div><div class='remaining'>"+dur(f.delta)+"</div></div>"
-  ).join("");
-}
-function shortStatus(fs){
-  const label=fs.found?(fs.label||fs.status):"Unknown";
-  if(label==="Delayed / estimated") return "Delayed";
-  return label;
-}
-function dotClassFor(f,state){
-  if(state.hsbNotStarted) return "dot-blue";
-  if(f.fs.safe_by_status) return "dot-green";
-  if(state.hsbFinished || f.delta<0) return "dot-green";
-  if(!f.fs.found) return "dot-grey";
-  if(f.delta<=30) return "dot-red";
-  return "dot-amber";
-}
-function rowClassFor(f,state){
-  if(state.hsbNotStarted) return "row-pre";
-  if(f.fs.safe_by_status) return f.fs.status==="departed"||f.fs.status==="landed" ? "row-departed" : "row-safe";
-  if(state.hsbFinished || f.delta<0) return "row-safe";
-  if(f.delta<=30) return "row-critical";
-  if(f.fs.confidence==="uncertain") return "row-uncertain";
-  return "row-live";
-}
-function reserveStatusFor(f,state){
-  if(state.hsbNotStarted) return {text:"HSB not started", cls:"prestatus"};
-  if(f.fs.safe_by_status) return {text:"Safe — "+shortStatus(f.fs), cls:"safe"};
-  if(state.hsbFinished) return {text:"Safe — HSB finished", cls:"safe"};
-  if(f.delta<0) return {text:"Safe — latest call passed", cls:"safe"};
-  if(f.delta<=30) return {text:"Last chance", cls:"red"};
-  if(f.delta<=60) return {text:"Still callable", cls:"amber"};
-  return {text:"Still callable", cls:"amber"};
-}
-function countdownFor(f,state){
-  if(state.hsbNotStarted) return "HSB starts in "+dur(state.hsbStartDelta);
-  if(f.fs.safe_by_status) return shortStatus(f.fs);
-  if(state.hsbFinished) return "HSB finished";
-  if(f.delta<0) return "Safe since "+fmt(f.safeAfter);
-  return "in "+dur(f.delta);
-}
-function renderTable(state){
-  const rowsEl=document.getElementById("rows");
-  rowsEl.innerHTML="";
-
-  for(const f of state.rows){
-    const delay=f.fs.departure&&f.fs.departure.delay!=null ? " +"+f.fs.departure.delay+"m" : "";
-    const fsText=shortStatus(f.fs)+delay;
-    const reserve=reserveStatusFor(f,state);
-    const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight);
-
-    const tr=document.createElement("tr");
-    tr.className=rowClassFor(f,state);
-    tr.innerHTML=
-      "<td><span class='dot "+dotClassFor(f,state)+"'></span><strong>"+f.flight+"</strong></td>"+
-      "<td>"+f.route+"</td>"+
-      "<td>"+fmt(f.schedTO)+"</td>"+
-      "<td>"+fmt(f.schedArr)+"</td>"+
-      "<td>"+minToBlock(f.block)+"</td>"+
-      "<td>"+fmt(f.latestTO)+"</td>"+
-      "<td><span class='badge'>"+fmt(f.latestCall)+"</span></td>"+
-      "<td><span class='badge'>"+fmt(f.safeAfter)+"</span><br><small>"+f.safeReason+"</small></td>"+
-      "<td>"+fsText+"</td>"+
-      "<td>"+countdownFor(f,state)+"</td>"+
-      "<td class='"+reserve.cls+"'>"+reserve.text+"</td>"+
-      "<td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";
-
-    rowsEl.appendChild(tr);
-  }
-}
-
-document.getElementById("parseBtn").addEventListener("click",parseAndRender);
-document.getElementById("statusBtn").addEventListener("click",refreshStatus);
-document.getElementById("hsbStart").addEventListener("input",render);
-document.getElementById("hsbEnd").addEventListener("input",render);
-
-const saved=localStorage.getItem(STORAGE_KEY);
-if(saved) document.getElementById("ficoInput").value=saved;
-
-parseAndRender();
-setInterval(render,10000);
-setInterval(refreshStatus,60000);
+let flights=[];let statuses={};let lastStatusUpdate=null;
+const HSB_TO_CHOCKS_LIMIT=1140,CALL_BEFORE_TAKEOFF=120,STORAGE_KEY="hsb-reserve-fico-v7";
+function toMin(t){const p=t.split(":").map(Number);return p[0]*60+p[1]}
+function compactToMin(s){s=String(s).replace(/\D/g,"").padStart(4,"0");return Number(s.slice(0,2))*60+Number(s.slice(2,4))}
+function minToBlock(mins){mins=Math.abs(mins);return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0")}
+function fmt(mins){const plus=mins>=1440?" +1":"";mins=((mins%1440)+1440)%1440;return String(Math.floor(mins/60)).padStart(2,"0")+String(mins%60).padStart(2,"0")+"Z"+plus}
+function dur(mins){mins=Math.max(0,Math.abs(mins));return Math.floor(mins/60)+"h "+String(mins%60).padStart(2,"0")+"m"}
+function utcNowMinutes(){const d=new Date();return d.getUTCHours()*60+d.getUTCMinutes()}
+function utcNowText(){const d=new Date();return String(d.getUTCHours()).padStart(2,"0")+String(d.getUTCMinutes()).padStart(2,"0")+"Z"}
+function futureDelta(targetMins,nowMins){let target=targetMins;while(target<nowMins-720)target+=1440;return target-nowMins}
+function normaliseEnd(start,end){return end<=start?end+1440:end}
+function parseFico(text){const parsed=[];for(const rawLine of text.split(/\n/)){const line=rawLine.trim();if(line.match(/^\d{3}\/\d{1,2}/))continue;const m=line.match(/^(\d{3})\s+([A-Z]{3})-([A-Z]{3})\s+(\d{4})\S*\s+\S+\s+\S+\s+(\d{4})/);if(!m)continue;const[,num,from,to,ptd,pta]=m;const schedTO=compactToMin(ptd);let schedArr=compactToMin(pta);if(schedArr<=schedTO)schedArr+=1440;parsed.push({flight:"BA"+num,from,to,route:from+"-"+to,schedTO,schedArr,block:schedArr-schedTO})}return parsed.sort((a,b)=>a.schedTO-b.schedTO)}
+async function refreshStatus(){if(!flights.length)return;const query=flights.map(f=>f.flight).join(",");try{const res=await fetch("/api/status?flights="+encodeURIComponent(query));const data=await res.json();if(data.ok&&data.flights){statuses=data.flights;lastStatusUpdate=new Date(data.updated);document.getElementById("parseNote").textContent="Updated: "+lastStatusUpdate.toUTCString()}else{document.getElementById("parseNote").textContent="Flight status error: "+(data.error||"unknown")}}catch(e){document.getElementById("parseNote").textContent="Flight status fetch failed: "+e}render()}
+function parseAndRender(){const text=document.getElementById("ficoInput").value;localStorage.setItem(STORAGE_KEY,text);flights=parseFico(text);statuses={};document.getElementById("parseNote").textContent="Parsed "+flights.length+" flights. Tomorrow rows ignored.";render();refreshStatus()}
+function computeRows(){const startInput=document.getElementById("hsbStart").value,endInput=document.getElementById("hsbEnd").value;if(!startInput||!endInput)return null;const hsbStart=toMin(startInput),hsbEnd=normaliseEnd(hsbStart,toMin(endInput)),latestOnBlocks=hsbStart+HSB_TO_CHOCKS_LIMIT,now=utcNowMinutes(),hsbStartDelta=futureDelta(hsbStart,now),hsbFinishDelta=futureDelta(hsbEnd,now),hsbNotStarted=hsbStartDelta>0&&hsbStartDelta<720,hsbFinished=hsbFinishDelta<0;const rows=flights.map(f=>{const latestTO=latestOnBlocks-f.block,latestCall=latestTO-CALL_BEFORE_TAKEOFF,callBy=Math.min(latestCall,hsbEnd),callByReason=hsbEnd<latestCall?"HSB finish":"Latest call",delta=futureDelta(callBy,now),fs=statuses[f.flight]||{status:"unknown",found:false,label:"Unknown",confidence:"none",safe_by_status:false};return{...f,latestOnBlocks,latestTO,latestCall,callBy,callByReason,delta,fs}});return{rows,hsbStart,hsbEnd,latestOnBlocks,now,hsbStartDelta,hsbFinishDelta,hsbNotStarted,hsbFinished}}
+function isSafe(f,state){return f.fs.safe_by_status||state.hsbFinished||f.delta<0}
+function isLive(f,state){return !state.hsbNotStarted&&!isSafe(f,state)}
+function dotClassFor(f,state){if(state.hsbNotStarted)return"dot-blue";if(isSafe(f,state))return"dot-green";if(!f.fs.found)return"dot-grey";if(f.delta<=30)return"dot-red";return"dot-amber"}
+function rowClassFor(f,state){if(state.hsbNotStarted)return"row-pre";if(isSafe(f,state))return f.fs.safe_by_status?"row-departed":"row-safe";if(f.delta<=30)return"row-critical";return"row-live"}
+function statusText(f,state){if(f.fs.safe_by_status)return f.fs.label||"Departed";if(state.hsbFinished||f.delta<0)return"Safe";if(!f.fs.found)return"Unknown";return f.fs.label||"Unknown"}
+function statusClass(f,state){const s=statusText(f,state);if(s==="Planned")return"status-planned";if(s==="Delayed")return"status-delayed";if(s==="Safe"||s==="Departed")return"status-safe";if(s==="Unknown")return"status-unknown";return"status-live"}
+function countdownText(f,state){if(state.hsbNotStarted)return"HSB starts "+dur(state.hsbStartDelta);if(isSafe(f,state))return"Safe";return dur(f.delta)+" left"}
+function render(){document.getElementById("utcClock").textContent=utcNowText();const state=computeRows();if(!state)return;renderCallable(state);renderStats(state);renderTable(state)}
+function renderCallable(state){const el=document.getElementById("aliveList"),live=state.rows.filter(f=>isLive(f,state));if(state.hsbNotStarted){el.innerHTML="<div class='callable-head'><span><i class='dot dot-blue'></i> HSB NOT STARTED</span><span class='callable-sub'>Starts in "+dur(state.hsbStartDelta)+"</span></div>";return}if(!live.length){el.innerHTML="<div class='callable-head'><span><i class='dot dot-green'></i> NO FLIGHTS STILL CALLABLE</span><span class='callable-sub'>Safe by time/status</span></div>";return}el.innerHTML="<div class='callable-head'><span><i class='dot dot-amber'></i> STILL CALLABLE ("+live.length+")</span><span class='callable-sub'>Flights you could still be called for</span></div>"+live.map(f=>"<div class='callable-row'><i class='dot "+dotClassFor(f,state)+"'></i><div class='callable-flight'>"+f.flight+"</div><div>"+f.to+"</div><div class='callable-call'>Call by "+fmt(f.callBy)+"<span class='small'>"+f.callByReason+"</span></div><div class='callable-time'>"+dur(f.delta)+"</div></div>").join("")}
+function renderStats(state){const safe=state.rows.filter(f=>isSafe(f,state)).length,live=state.rows.filter(f=>isLive(f,state)).length,action=state.rows.filter(f=>isLive(f,state)&&f.delta<=30).length,unknown=state.rows.filter(f=>!f.fs.found).length,notStarted=state.hsbNotStarted?state.rows.length:0;document.getElementById("stats").innerHTML="<div class='stat safe'><i class='dot dot-green'></i><div class='num'>"+safe+"</div><div class='lbl'>Safe</div></div><div class='stat callable'><i class='dot dot-amber'></i><div class='num'>"+live+"</div><div class='lbl'>Still callable</div></div><div class='stat action'><i class='dot dot-red'></i><div class='num'>"+action+"</div><div class='lbl'>Action required</div></div><div class='stat blue'><i class='dot dot-blue'></i><div class='num'>"+notStarted+"</div><div class='lbl'>HSB not started</div></div><div class='stat unknown'><i class='dot dot-grey'></i><div class='num'>"+unknown+"</div><div class='lbl'>Unknown</div></div>"}
+function renderTable(state){const rowsEl=document.getElementById("rows");rowsEl.innerHTML="";for(const f of state.rows){const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight),callBadge=isSafe(f,state)?"badge-green":"badge-amber",tr=document.createElement("tr");tr.className=rowClassFor(f,state);tr.innerHTML="<td><span class='dot "+dotClassFor(f,state)+"'></span></td><td><strong>"+f.flight+"</strong></td><td>"+f.route+"</td><td>"+fmt(f.schedTO).replace('Z','')+"</td><td>"+fmt(f.schedArr).replace('Z','')+"</td><td>"+minToBlock(f.block)+"</td><td><span class='badge "+callBadge+"'>"+fmt(f.callBy)+"</span><span class='small'>"+f.callByReason+"</span></td><td class='"+statusClass(f,state)+"'>"+statusText(f,state)+"</td><td>"+countdownText(f,state)+"</td><td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";rowsEl.appendChild(tr)}}
+document.getElementById("parseBtn").addEventListener("click",parseAndRender);document.getElementById("statusBtn").addEventListener("click",refreshStatus);document.getElementById("hsbStart").addEventListener("input",render);document.getElementById("hsbEnd").addEventListener("input",render);const saved=localStorage.getItem(STORAGE_KEY);if(saved)document.getElementById("ficoInput").value=saved;parseAndRender();setInterval(render,10000);setInterval(refreshStatus,60000);
 </script>
 </body>
 </html>`;
