@@ -1,17 +1,10 @@
-# HSB Reserve App v9
+# HSB Reserve App v10
 
-Single Cloudflare Worker application.
+Uses FlightAware AeroAPI with manual refresh only and an $8/month app-side cap.
 
-v9 changes:
-- Removed the top still-callable panel.
-- Removed summary/stat cards.
-- Kept the chronological operational table as the main display.
-- Active flight handling adjusted:
-  - active + departure/live evidence = Departed
-  - active + more than 90 minutes past STD = Departed
-  - active + less than 90 minutes past STD = Delayed
-  - no API data still uses conservative Planned/Delayed timing.
+Required Cloudflare configuration:
 
-Required Cloudflare secret:
+- Secret: `FLIGHTAWARE_API_KEY`
+- KV namespace binding: `USAGE_KV`
 
-`AVIATIONSTACK_KEY`
+The app blocks AeroAPI calls if `USAGE_KV` is missing.
