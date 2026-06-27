@@ -50,7 +50,7 @@ function json(body, status = 200) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v11",
+    version: "v14",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     kv_binding_expected: "USAGE_KV",
@@ -74,7 +74,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v11",
+    version: "v14",
     month: currentMonthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -176,7 +176,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v11",
+    version: "v14",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     cap_usd: MONTHLY_CAP_USD,
@@ -390,12 +390,19 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 .legend{display:flex;gap:18px;flex-wrap:wrap;padding:11px 14px;color:#c9d1d9;font-size:.88rem}.legend span{display:inline-flex;gap:7px;align-items:center}.note{padding:12px 14px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line)}
 .errorbox{padding:10px 14px;border:1px solid rgba(255,75,75,.5);background:rgba(255,75,75,.08);border-radius:12px;margin-bottom:12px;color:#ffb8b8;display:none}
 @media(max-width:800px){.header{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr 1fr}.fico-grid{grid-template-columns:1fr}table{font-size:.9rem;min-width:900px}.guard{grid-template-columns:1fr}}
+
+.checks{display:flex;gap:6px;align-items:center}
+.check-link{display:inline-block;text-decoration:none;background:#05080c;border:1px solid #244b78;padding:5px 7px;border-radius:7px;font-size:.78rem;font-weight:900;line-height:1}
+.check-link.ba{color:#fff;border-color:#555}
+.check-link.lhr{color:#d8b4ff;border-color:#5b3f85}
+.check-link.fa{color:#74b9ff;border-color:#244b78}
+
 </style>
 </head>
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v11</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p></div>
+  <div><h1>HSB Reserve App <span class="version">v14</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p></div>
   <div class="controls">
     <div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div>
     <div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div>
@@ -411,9 +418,9 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
   </div>
 </section>
 <section class="card">
-  <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Google</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable</span><span><i class="dot dot-red"></i> Action required</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown</span></div>
-  <div class="note">Call by = earlier of latest legal call time or HSB finish. Rows remain chronological. FlightAware is only queried when you press Refresh live status.</div>
+  <div class="note">Call by = earlier of latest legal call time or HSB finish. Departed and Cancelled both show green because both are operationally safe. BA/LHR/FA open external checks. FlightAware API is only queried when you press Refresh live status.</div>
 </section>
 </main>
 <script>
@@ -427,7 +434,7 @@ let usageGuard = null;
 const HSB_TO_CHOCKS_LIMIT = 1140;
 const CALL_BEFORE_TAKEOFF = 120;
 const COST_PER_FLIGHT_USD = 0.005;
-const STORAGE_KEY = "hsb-reserve-fico-v11";
+const STORAGE_KEY = "hsb-reserve-fico-v14";
 
 function $(id){ return document.getElementById(id); }
 function showError(msg){ const el = $("errorBox"); el.style.display = "block"; el.textContent = msg; }
@@ -567,7 +574,6 @@ function render(){
   const rowsEl = $("rows");
   rowsEl.innerHTML = "";
   for (const f of state.rows) {
-    const googleUrl = "https://www.google.com/search?q=" + encodeURIComponent(f.flight);
     const callBadge = isSafe(f,state) ? "badge-green" : "badge-amber";
     const tr = document.createElement("tr");
     tr.className = rowClassFor(f,state);
@@ -581,9 +587,44 @@ function render(){
       "<td><span class='badge " + callBadge + "'>" + fmt(f.callBy) + "</span><span class='small'>" + f.callByReason + "</span></td>" +
       "<td class='" + statusClass(f,state) + "'>" + operationalStatus(f,state) + "</td>" +
       "<td>" + countdownText(f,state) + "</td>" +
-      "<td><a class='status-link' target='_blank' rel='noopener' href='" + googleUrl + "'>Check</a></td>";
+      "<td>" + checksHtmlForLinks(f.flight) + "</td>";
     rowsEl.appendChild(tr);
   }
+}
+
+
+function todayIsoForLinks(){
+  return new Date().toISOString().slice(0, 10);
+}
+
+function flightNumberOnlyForLinks(flight){
+  return String(flight || "").replace(/^BA/i, "").replace(/\D/g, "");
+}
+
+function baStatusUrlForLinks(flight){
+  const num = flightNumberOnlyForLinks(flight);
+  return "https://www.britishairways.com/travel/flightstatus/public/en_us/results/loaded?searchMethod=flight&date=" +
+    todayIsoForLinks() +
+    "&isDepartures=true&flightNumber=" +
+    encodeURIComponent(num);
+}
+
+function lhrStatusUrlForLinks(flight){
+  return "https://www.heathrow.com/departures/terminal-5/flight-details/" + encodeURIComponent(flight);
+}
+
+function flightAwarePublicUrlForLinks(flight){
+  const raw = flightNumberOnlyForLinks(flight);
+  const num = raw.replace(/^0+/, "") || raw;
+  return "https://uk.flightaware.com/live/flight/BAW" + encodeURIComponent(num);
+}
+
+function checksHtmlForLinks(flight){
+  return "<div class='checks'>" +
+    "<a class='check-link ba' target='_blank' rel='noopener' href='" + baStatusUrlForLinks(flight) + "'>BA</a>" +
+    "<a class='check-link lhr' target='_blank' rel='noopener' href='" + lhrStatusUrlForLinks(flight) + "'>LHR</a>" +
+    "<a class='check-link fa' target='_blank' rel='noopener' href='" + flightAwarePublicUrlForLinks(flight) + "'>FA</a>" +
+    "</div>";
 }
 
 function start(){
