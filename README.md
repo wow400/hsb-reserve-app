@@ -1,12 +1,15 @@
-# HSB Reserve App v10.1
+# HSB Reserve App v11
 
-v10.1 fixes:
-- Fixes frontend startup issue where page stayed on "Loading usage guard...".
-- Restores UTC clock and table rendering.
-- Keeps FlightAware AeroAPI manual refresh only.
-- Keeps USAGE_KV cost guard and 10-minute cache.
-- Keeps $8 app-side monthly cap.
+Clean rebuild.
 
-Required Cloudflare configuration:
-- Secret: `FLIGHTAWARE_API_KEY`
-- KV namespace binding: `USAGE_KV`
+Cloudflare requirements:
+- Secret: FLIGHTAWARE_API_KEY
+- KV binding: USAGE_KV
+- KV namespace ID included in wrangler.toml
+
+Safety:
+- Manual FlightAware refresh only
+- No automatic paid polling
+- $8.00 monthly app cap
+- 10-minute cached FlightAware responses
+- Blocks paid calls if usage tracking fails
