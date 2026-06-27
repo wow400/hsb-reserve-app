@@ -1,15 +1,12 @@
-# HSB Reserve App v11
+# HSB Reserve App v14
 
-Clean rebuild.
+Built from the working v11 base with minimal changes only.
 
-Cloudflare requirements:
-- Secret: FLIGHTAWARE_API_KEY
-- KV binding: USAGE_KV
-- KV namespace ID included in wrangler.toml
-
-Safety:
-- Manual FlightAware refresh only
-- No automatic paid polling
-- $8.00 monthly app cap
-- 10-minute cached FlightAware responses
-- Blocks paid calls if usage tracking fails
+Changes:
+- Replaces Google/Check with BA / LHR / FA.
+- BA opens British Airways flight status for today's date.
+- LHR opens Heathrow flight details.
+- FA opens FlightAware public tracking page.
+- Cancelled remains green/safe, but still displays as Cancelled.
+- Keeps FlightAware manual refresh, $8 cap, 10-minute cache and USAGE_KV.
+- wrangler.toml includes the USAGE_KV binding.
