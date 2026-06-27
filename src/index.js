@@ -289,7 +289,7 @@ td{color:#eef3f8}
 <main class="app">
 <section class="header">
   <div>
-    <h1>HSB Reserve App <span class="version">v10</span></h1>
+    <h1>HSB Reserve App <span class="version">v10.1</span></h1>
     <p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p>
   </div>
   <div class="controls">
@@ -348,7 +348,7 @@ td{color:#eef3f8}
 
 <script>
 let flights=[];let statuses={};let lastStatusUpdate=null;let usageGuard=null;
-const HSB_TO_CHOCKS_LIMIT=1140,CALL_BEFORE_TAKEOFF=120,COST_PER_FLIGHT_USD=0.005,STORAGE_KEY="hsb-reserve-fico-v10";
+const HSB_TO_CHOCKS_LIMIT=1140,CALL_BEFORE_TAKEOFF=120,COST_PER_FLIGHT_USD=0.005,STORAGE_KEY="hsb-reserve-fico-v10-1";
 function toMin(t){const p=t.split(":").map(Number);return p[0]*60+p[1]}
 function compactToMin(s){s=String(s).replace(/\D/g,"").padStart(4,"0");return Number(s.slice(0,2))*60+Number(s.slice(2,4))}
 function minToBlock(mins){mins=Math.abs(mins);return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0")}
@@ -375,7 +375,7 @@ function statusClass(f,state){const s=operationalStatus(f,state);if(s==="Planned
 function countdownText(f,state){if(state.hsbNotStarted)return"HSB starts "+dur(state.hsbStartDelta);if(isSafe(f,state))return"Safe";return dur(f.delta)+" left"}
 function render(){const clock=document.getElementById("utcClock");if(clock)clock.textContent=utcNowText();const state=computeRows();if(!state)return;renderTable(state)}
 function renderTable(state){const rowsEl=document.getElementById("rows");rowsEl.innerHTML="";for(const f of state.rows){const googleUrl="https://www.google.com/search?q="+encodeURIComponent(f.flight),callBadge=isSafe(f,state)?"badge-green":"badge-amber",tr=document.createElement("tr");tr.className=rowClassFor(f,state);tr.innerHTML="<td><span class='dot "+dotClassFor(f,state)+"'></span></td><td><strong>"+f.flight+"</strong></td><td>"+f.route+"</td><td>"+fmtShort(f.schedTO)+"</td><td>"+fmtShort(f.schedArr)+"</td><td>"+minToBlock(f.block)+"</td><td><span class='badge "+callBadge+"'>"+fmt(f.callBy)+"</span><span class='small'>"+f.callByReason+"</span></td><td class='"+statusClass(f,state)+"'>"+operationalStatus(f,state)+"</td><td>"+countdownText(f,state)+"</td><td><a class='status-link' target='_blank' rel='noopener' href='"+googleUrl+"'>Check</a></td>";rowsEl.appendChild(tr)}}
-document.getElementById("parseBtn").addEventListener("click",parseAndRender);document.getElementById("statusBtn").addEventListener("click",refreshStatus);document.getElementById("usageBtn").addEventListener("click",checkUsage);document.getElementById("hsbStart").addEventListener("input",render);document.getElementById("hsbEnd").addEventListener("input",render);const saved=localStorage.getItem(STORAGE_KEY);if(saved)document.getElementById("ficoInput").value=saved;parseAndRender();checkUsage();setInterval(render,10000);
+document.getElementById("parseBtn").addEventListener("click",parseAndRender);document.getElementById("statusBtn").addEventListener("click",refreshStatus);document.getElementById("usageBtn").addEventListener("click",checkUsage);document.getElementById("hsbStart").addEventListener("input",render);document.getElementById("hsbEnd").addEventListener("input",render);try{const saved=localStorage.getItem(STORAGE_KEY);if(saved)document.getElementById("ficoInput").value=saved;parseAndRender();checkUsage();setInterval(render,10000)}catch(e){const guard=document.getElementById("usageGuard");if(guard)guard.innerHTML="<strong class='bad'>Frontend startup error:</strong> "+String(e);const clock=document.getElementById("utcClock");if(clock)clock.textContent="ERROR"}
 </script>
 </body>
 </html>`;
