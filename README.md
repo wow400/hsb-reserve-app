@@ -1,12 +1,12 @@
-# HSB Reserve App v14
+# HSB Reserve App v15
 
-Built from the working v11 base with minimal changes only.
+Clean rebuild after frontend startup issue.
 
-Changes:
-- Replaces Google/Check with BA / LHR / FA.
-- BA opens British Airways flight status for today's date.
-- LHR opens Heathrow flight details.
-- FA opens FlightAware public tracking page.
-- Cancelled remains green/safe, but still displays as Cancelled.
-- Keeps FlightAware manual refresh, $8 cap, 10-minute cache and USAGE_KV.
+- Avoids embedded regex in browser JavaScript.
+- Keeps FlightAware AeroAPI manual refresh only.
+- Keeps USAGE_KV usage/cost guard.
+- Keeps $8 monthly app cap.
+- Keeps 10-minute FlightAware cache.
+- Adds BA / LHR / FA external check links.
+- Cancelled remains green/safe but displays as Cancelled.
 - wrangler.toml includes the USAGE_KV binding.
