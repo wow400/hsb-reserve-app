@@ -1,21 +1,10 @@
-# HSB Reserve App v18
+# HSB Reserve App v19
 
-Built cleanly from v17.
+Built cleanly from v18.
 
 Changes:
-- Live refresh line now shows time as `0659Z`, without the extra word "Zulu".
-- Adds FICO reminder:
-  - `DP LHR b8 l8 u8 v8 w8 = 787`
-  - `DP LHR a8 = A380`
-- Uses stable local storage keys for:
-  - pasted FICO list
-  - HSB start time
-  - HSB finish time
-
-Keeps:
-- FICO X rows shown as Cancelled without AeroAPI lookup.
-- Continuation-sector filtering.
-- Route-aware AeroAPI matching.
-- LIVE/cache age.
-- Colour-coded Calls figure.
-- BA/LHR/FA external checks.
+- Adds a 19-hour rule from HSB start to scheduled arrival.
+- Flights landing 19h or more after HSB start are marked green/safe as `Cannot cover`.
+- FICO-cancelled and cannot-cover flights are not sent to AeroAPI.
+- Grey remains reserved for not-live-refreshed/unknown rows.
+- Keeps stable local storage keys, FICO reminder, BA/LHR/FA checks and $8 AeroAPI guard.
