@@ -1,10 +1,17 @@
-# HSB Reserve App v19
+# HSB Reserve App v20
 
-Built cleanly from v18.
+Built cleanly from v19.
 
 Changes:
-- Adds a 19-hour rule from HSB start to scheduled arrival.
-- Flights landing 19h or more after HSB start are marked green/safe as `Cannot cover`.
-- FICO-cancelled and cannot-cover flights are not sent to AeroAPI.
-- Grey remains reserved for not-live-refreshed/unknown rows.
-- Keeps stable local storage keys, FICO reminder, BA/LHR/FA checks and $8 AeroAPI guard.
+- Moves the FICO reminder under the HSB Start / HSB Finish / UTC clock block.
+- Planned is now amber/yellow, not green.
+- If no live refresh has been done and UTC passes scheduled ETD, status becomes `Past ETD — refresh`.
+- `Past ETD — refresh` is red with a red dot.
+- Green remains reserved for safe states: Departed, Cancelled, Cannot cover, Safe.
+
+Keeps:
+- 19-hour cannot-cover rule.
+- FICO X rows shown as Cancelled without AeroAPI lookup.
+- Stable local storage keys.
+- BA/LHR/FA checks.
+- $8 AeroAPI guard and 10-minute cache.
