@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v19",
+    version: "v20",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v19",
+    version: "v20",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -164,7 +164,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v19",
+    version: "v20",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -339,7 +339,7 @@ h1{margin:0;font-size:1.65rem}.version{font-size:.78rem;background:#102742;color
 button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}button.danger{border-color:#765025;color:#ffc400}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
 .table-scroll{overflow-x:auto}table{width:100%;min-width:930px;border-collapse:collapse;font-size:.95rem}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;white-space:nowrap;vertical-align:middle}th{background:#111922;color:#c9d1d9;font-size:.78rem;font-weight:900}td{color:#eef3f8}
 .badge{font-weight:900;border-radius:8px;display:inline-block;padding:3px 7px}.badge-green{background:rgba(65,212,90,.14);color:var(--green)}.badge-amber{background:rgba(255,196,0,.14);color:var(--amber)}.small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
-.status-planned{color:var(--green);font-weight:900}.status-delayed{color:var(--amber);font-weight:900}.status-safe{color:var(--green);font-weight:900}.status-unknown{color:var(--grey);font-weight:900}.row-safe{background:rgba(65,212,90,.06)}.row-pre{background:rgba(88,166,255,.07)}.row-live{background:rgba(255,196,0,.06)}.row-critical{background:rgba(255,75,75,.12)}.row-departed{background:rgba(255,255,255,.035)}
+.status-planned{color:var(--amber);font-weight:900}.status-delayed{color:var(--amber);font-weight:900}.status-action{color:var(--red);font-weight:900}.status-safe{color:var(--green);font-weight:900}.status-unknown{color:var(--grey);font-weight:900}.row-safe{background:rgba(65,212,90,.06)}.row-pre{background:rgba(88,166,255,.07)}.row-live{background:rgba(255,196,0,.06)}.row-critical{background:rgba(255,75,75,.12)}.row-departed{background:rgba(255,255,255,.035)}
 .dot{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:-4px;box-shadow:inset 0 2px 3px rgba(255,255,255,.85),inset 0 -3px 5px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.5)}.dot-green{background:linear-gradient(#83ff83,#0cad2a)}.dot-amber{background:linear-gradient(#ffd56a,#ff9800)}.dot-red{background:linear-gradient(#ff7777,#d60000)}.dot-blue{background:linear-gradient(#7db7ff,#1b64d8)}.dot-grey{background:linear-gradient(#eee,#9aa3ad)}
 .checks{display:flex;gap:6px}.check-link{display:inline-block;text-decoration:none;background:#05080c;border:1px solid #244b78;padding:5px 7px;border-radius:7px;font-size:.78rem;font-weight:900;line-height:1}.check-link.ba{color:#fff;border-color:#555}.check-link.lhr{color:#d8b4ff;border-color:#5b3f85}.check-link.fa{color:#74b9ff;border-color:#244b78}
 .legend{display:flex;gap:18px;flex-wrap:wrap;padding:11px 14px;color:#c9d1d9;font-size:.88rem}.legend span{display:inline-flex;gap:7px;align-items:center}.note{padding:12px 14px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line)}
@@ -354,8 +354,8 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v19</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p><p class="sub">FICO reminder: <strong>DP LHR b8 l8 u8 v8 w8</strong> = 787 · <strong>DP LHR a8</strong> = A380</p></div>
-  <div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div>
+  <div><h1>HSB Reserve App <span class="version">v20</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px">FICO reminder: <strong>DP LHR b8 l8 u8 v8 w8</strong> = 787 · <strong>DP LHR a8</strong> = A380</p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
 <section class="card guard" style="display:none"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
@@ -363,7 +363,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable</span><span><i class="dot dot-red"></i> Action required</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown</span></div>
-  <div class="note">Call by = earlier of latest legal call time or HSB finish. Departed, Cancelled and Cannot cover are green because they are safe from this HSB. BA/LHR/FA open external checks.</div>
+  <div class="note">Call by = earlier of latest legal call time or HSB finish. Green = safe from this HSB. Amber = still in play. Red = past ETD / refresh needed. Grey = not live refreshed or unknown. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -554,17 +554,25 @@ function computeRows(){
 }
 
 function apiHasUsefulStatus(f){ return f.fs && f.fs.found && f.fs.label && f.fs.label !== "Unknown"; }
+function scheduledEtdPassed(f,state){
+  if (!f || !state) return false;
+  var sched = f.schedTO;
+  while (sched < state.now - 720) sched += 1440;
+  return state.now >= sched;
+}
 function operationalStatus(f,state){
   if (f.fs && f.fs.safe_by_status) return f.fs.label || "Departed";
   if (f.cannotCoverFromThisHsb) return "Cannot cover";
   if (state.hsbFinished || f.delta < 0) return "Safe";
   if (apiHasUsefulStatus(f)) return f.fs.label;
+  if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "Past ETD — refresh";
   if (state.now >= f.schedTO) return "Delayed";
   return "Planned";
 }
 function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || f.cannotCoverFromThisHsb || state.hsbFinished || f.delta < 0; }
 function dotClassFor(f,state){
   if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "dot-green";
+  if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "dot-red";
   if (f.fs && f.fs.status === "no_live_refresh") return "dot-grey";
   if(state.hsbNotStarted)return"dot-blue";
   if(isSafe(f,state))return"dot-green";
@@ -574,13 +582,14 @@ function dotClassFor(f,state){
 }
 function rowClassFor(f,state){
   if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "row-departed";
+  if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "row-critical";
   if (f.fs && f.fs.status === "no_live_refresh") return "";
   if(state.hsbNotStarted)return"row-pre";
   if(isSafe(f,state))return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe";
   if(f.delta<=30)return"row-critical";
   return"row-live";
 }
-function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s==="Cannot cover")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
+function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-action"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s==="Cannot cover")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
 function countdownText(f,state){
   if(isSafe(f,state))return"Safe";
   if(f.delta < 0)return"Expired";
