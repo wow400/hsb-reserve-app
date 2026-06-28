@@ -1,12 +1,11 @@
-# HSB Reserve App v15
+# HSB Reserve App v16
 
-Clean rebuild after frontend startup issue.
+Built cleanly from the working v15 base.
 
-- Avoids embedded regex in browser JavaScript.
-- Keeps FlightAware AeroAPI manual refresh only.
-- Keeps USAGE_KV usage/cost guard.
-- Keeps $8 monthly app cap.
-- Keeps 10-minute FlightAware cache.
-- Adds BA / LHR / FA external check links.
-- Cancelled remains green/safe but displays as Cancelled.
+Changes:
+- Moves the AeroAPI guard line into the header under the main subtitle.
+- Removes the large separate usage guard panel from the visible UI.
+- Before live status refresh, flight dots are grey rather than amber.
+- Keeps BA/LHR/FA external check links.
+- Keeps FlightAware manual refresh, $8 cap, 10-minute cache and USAGE_KV.
 - wrangler.toml includes the USAGE_KV binding.
