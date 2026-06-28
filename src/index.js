@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v17",
+    version: "v18",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v17",
+    version: "v18",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -164,7 +164,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v17",
+    version: "v18",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -354,7 +354,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v17</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v18</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p><p class="sub">FICO reminder: <strong>DP LHR b8 l8 u8 v8 w8</strong> = 787 · <strong>DP LHR a8</strong> = A380</p></div>
   <div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -377,7 +377,9 @@ var lastLiveRefreshAt = null;
 var HSB_TO_CHOCKS_LIMIT = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
 var COST_PER_FLIGHT_USD = 0.005;
-var STORAGE_KEY = "hsb-reserve-fico-v17";
+var STORAGE_KEY = "hsb-reserve-fico-current";
+var HSB_START_KEY = "hsb-reserve-hsb-start";
+var HSB_END_KEY = "hsb-reserve-hsb-finish";
 
 function byId(id){ return document.getElementById(id); }
 function showError(msg){ var el = byId("errorBox"); if(el){ el.style.display = "block"; el.textContent = msg; } }
@@ -394,7 +396,7 @@ function updateLiveLine(){
   if (!el) return;
   if (!lastLiveRefreshAt) { el.textContent = "Not refreshed"; return; }
   var d = new Date(lastLiveRefreshAt);
-  el.innerHTML = "<span class='live-badge'>LIVE</span> <span class='cache-note'>" + liveAgeText() + " — exact Zulu: " + String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z</span>";
+  el.innerHTML = "<span class='live-badge'>LIVE</span> <span class='cache-note'>" + liveAgeText() + " — " + String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z</span>";
 }
 function toMin(t){ var p = t.split(":").map(Number); return p[0] * 60 + p[1]; }
 function digitsOnly(s){ return String(s || "").split("").filter(function(c){ return c >= "0" && c <= "9"; }).join(""); }
@@ -609,8 +611,19 @@ function start(){
   byId("parseBtn").addEventListener("click", parseAndRender);
   byId("statusBtn").addEventListener("click", refreshStatus);
   byId("usageBtn").addEventListener("click", checkUsage);
-  byId("hsbStart").addEventListener("input", render);
-  byId("hsbEnd").addEventListener("input", render);
+  byId("hsbStart").addEventListener("input", function(){
+    localStorage.setItem(HSB_START_KEY, byId("hsbStart").value);
+    render();
+  });
+  byId("hsbEnd").addEventListener("input", function(){
+    localStorage.setItem(HSB_END_KEY, byId("hsbEnd").value);
+    render();
+  });
+  var savedStart = localStorage.getItem(HSB_START_KEY);
+  var savedEnd = localStorage.getItem(HSB_END_KEY);
+  if (savedStart) byId("hsbStart").value = savedStart;
+  if (savedEnd) byId("hsbEnd").value = savedEnd;
+
   var saved = localStorage.getItem(STORAGE_KEY);
   if (saved) byId("ficoInput").value = saved;
   parseAndRender();
