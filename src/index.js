@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v18",
+    version: "v19",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v18",
+    version: "v19",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -164,7 +164,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v18",
+    version: "v19",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -354,7 +354,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v18</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p><p class="sub">FICO reminder: <strong>DP LHR b8 l8 u8 v8 w8</strong> = 787 · <strong>DP LHR a8</strong> = A380</p></div>
+  <div><h1>HSB Reserve App <span class="version">v19</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p><p class="sub">FICO reminder: <strong>DP LHR b8 l8 u8 v8 w8</strong> = 787 · <strong>DP LHR a8</strong> = A380</p></div>
   <div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -363,7 +363,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable</span><span><i class="dot dot-red"></i> Action required</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown</span></div>
-  <div class="note">Call by = earlier of latest legal call time or HSB finish. Departed and Cancelled both show green because both are operationally safe. BA/LHR/FA open external checks.</div>
+  <div class="note">Call by = earlier of latest legal call time or HSB finish. Departed, Cancelled and Cannot cover are green because they are safe from this HSB. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -375,6 +375,7 @@ var statuses = {};
 var usageGuard = null;
 var lastLiveRefreshAt = null;
 var HSB_TO_CHOCKS_LIMIT = 1140;
+var CANNOT_COVER_AFTER_HSB_START = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
 var COST_PER_FLIGHT_USD = 0.005;
 var STORAGE_KEY = "hsb-reserve-fico-current";
@@ -409,6 +410,11 @@ function utcNowMinutes(){ var d = new Date(); return d.getUTCHours()*60 + d.getU
 function utcNowText(){ var d = new Date(); return String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z"; }
 function futureDelta(targetMins, nowMins){ var target = targetMins; while(target < nowMins - 720) target += 1440; return target - nowMins; }
 function normaliseEnd(start,end){ return end <= start ? end + 1440 : end; }
+function cannotCoverFromHsb(f, hsbStart){
+  var arrival = f.schedArr;
+  while (arrival < hsbStart) arrival += 1440;
+  return (arrival - hsbStart) >= CANNOT_COVER_AFTER_HSB_START;
+}
 
 function parseFico(text){
   var parsed = [];
@@ -472,17 +478,19 @@ async function refreshStatus(){
     byId("parseNote").textContent = "Live refresh blocked: usage guard unavailable.";
     return;
   }
-  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled; }).length;
+  var hsbStartForRefresh = toMin(byId("hsbStart").value);
+  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh); }).length;
   var estimated = refreshableCount * COST_PER_FLIGHT_USD;
-  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
+  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled and cannot-cover flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
   if (!ok) {
     byId("parseNote").textContent = "Live refresh cancelled. No AeroAPI calls made.";
     return;
   }
   try {
-    var refreshable = flights.filter(function(f){ return !f.ficoCancelled; });
+    var hsbStartForRefresh = toMin(byId("hsbStart").value);
+    var refreshable = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh); });
     if (!refreshable.length) {
-      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are already cancelled in FICO.";
+      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are cancelled or cannot be covered from this HSB.";
       return;
     }
     var meta = {};
@@ -512,9 +520,11 @@ function parseAndRender(){
   localStorage.setItem(STORAGE_KEY, text);
   flights = parseFico(text);
   statuses = {};
-  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled; }).length;
-  var cancelledCount = flights.length - refreshableCount;
-  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
+  var hsbStartForSummary = toMin(byId("hsbStart").value);
+  var cancelledCount = flights.filter(function(f){ return f.ficoCancelled; }).length;
+  var cannotCoverCount = flights.filter(function(f){ return !f.ficoCancelled && cannotCoverFromHsb(f, hsbStartForSummary); }).length;
+  var refreshableCount = flights.length - cancelledCount - cannotCoverCount;
+  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. " + cannotCoverCount + " cannot cover. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
   render();
 }
 
@@ -537,7 +547,8 @@ function computeRows(){
     var callByReason = hsbEnd < latestCall ? "HSB finish" : "Latest call";
     var delta = futureDelta(callBy, now);
     var fs = f.ficoCancelled ? { status:"cancelled", found:true, label:"Cancelled", safe_by_status:true, source:"fico" } : (statuses[f.flight] || { status:"no_live_refresh", found:false, label:null, safe_by_status:false });
-    return Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs });
+    var cannotCover = cannotCoverFromHsb(f, hsbStart);
+    return Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs, cannotCoverFromThisHsb:cannotCover });
   });
   return { rows:rows, hsbStart:hsbStart, hsbEnd:hsbEnd, latestOnBlocks:latestOnBlocks, now:now, hsbStartDelta:hsbStartDelta, hsbFinishDelta:hsbFinishDelta, hsbNotStarted:hsbNotStarted, hsbFinished:hsbFinished };
 }
@@ -545,13 +556,15 @@ function computeRows(){
 function apiHasUsefulStatus(f){ return f.fs && f.fs.found && f.fs.label && f.fs.label !== "Unknown"; }
 function operationalStatus(f,state){
   if (f.fs && f.fs.safe_by_status) return f.fs.label || "Departed";
+  if (f.cannotCoverFromThisHsb) return "Cannot cover";
   if (state.hsbFinished || f.delta < 0) return "Safe";
   if (apiHasUsefulStatus(f)) return f.fs.label;
   if (state.now >= f.schedTO) return "Delayed";
   return "Planned";
 }
-function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || state.hsbFinished || f.delta < 0; }
+function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || f.cannotCoverFromThisHsb || state.hsbFinished || f.delta < 0; }
 function dotClassFor(f,state){
+  if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "dot-green";
   if (f.fs && f.fs.status === "no_live_refresh") return "dot-grey";
   if(state.hsbNotStarted)return"dot-blue";
   if(isSafe(f,state))return"dot-green";
@@ -560,13 +573,14 @@ function dotClassFor(f,state){
   return"dot-amber";
 }
 function rowClassFor(f,state){
+  if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "row-departed";
   if (f.fs && f.fs.status === "no_live_refresh") return "";
   if(state.hsbNotStarted)return"row-pre";
   if(isSafe(f,state))return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe";
   if(f.delta<=30)return"row-critical";
   return"row-live";
 }
-function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
+function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s==="Cannot cover")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
 function countdownText(f,state){
   if(isSafe(f,state))return"Safe";
   if(f.delta < 0)return"Expired";
