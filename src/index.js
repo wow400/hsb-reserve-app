@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v15",
+    version: "v16",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v15",
+    version: "v16",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -153,7 +153,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v15",
+    version: "v16",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -327,11 +327,11 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v15</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p></div>
+  <div><h1>HSB Reserve App <span class="version">v16</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p></div>
   <div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
-<section class="card guard"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
+<section class="card guard" style="display:none"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
 <section class="card fico"><div class="fico-grid"><div><label for="ficoInput">Paste BA/FICO flight list</label><textarea id="ficoInput" spellcheck="false">${esc(DEFAULT_FICO)}</textarea></div><div class="button-col"><button class="primary" id="parseBtn">Parse FICO list</button><button class="danger" id="statusBtn">Refresh live status</button><div id="parseNote" class="parse-note">No automatic paid polling.</div></div></div></section>
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
@@ -349,7 +349,7 @@ var usageGuard = null;
 var HSB_TO_CHOCKS_LIMIT = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
 var COST_PER_FLIGHT_USD = 0.005;
-var STORAGE_KEY = "hsb-reserve-fico-v15";
+var STORAGE_KEY = "hsb-reserve-fico-v16";
 
 function byId(id){ return document.getElementById(id); }
 function showError(msg){ var el = byId("errorBox"); if(el){ el.style.display = "block"; el.textContent = msg; } }
@@ -394,13 +394,18 @@ async function checkUsage(){
     var data = await res.json();
     usageGuard = data;
     if (!data.ok) {
-      byId("usageGuard").innerHTML = "<strong class='bad'>AeroAPI blocked:</strong> " + (data.error || "usage guard unavailable");
+      var blockedLine = "AeroAPI blocked: " + (data.error || "usage guard unavailable");
+      byId("usageGuard").innerHTML = "<strong class='bad'>" + blockedLine + "</strong>";
+      byId("headerUsage").textContent = blockedLine;
       return;
     }
-    byId("usageGuard").innerHTML = "<strong class='ok'>AeroAPI guard active.</strong> Used this month: <strong>" + money(data.used_usd) + "</strong> / $" + Number(data.cap_usd).toFixed(2) + ". Remaining: <strong>" + money(data.remaining_usd) + "</strong>. Calls: <strong>" + data.calls + "</strong>. Cache: " + Math.round(data.cache_ttl_seconds/60) + " min.";
+    var usageLine = "AeroAPI guard active. Used this month: " + money(data.used_usd) + " / $" + Number(data.cap_usd).toFixed(2) + ". Remaining: " + money(data.remaining_usd) + ". Calls: " + data.calls + ". Cache: " + Math.round(data.cache_ttl_seconds/60) + " min.";
+    byId("usageGuard").innerHTML = "<strong class='ok'>" + usageLine + "</strong>";
+    byId("headerUsage").textContent = usageLine;
   } catch(e) {
     usageGuard = null;
-    byId("usageGuard").innerHTML = "<strong class='bad'>AeroAPI blocked:</strong> usage check failed.";
+    byId("usageGuard").innerHTML = "<strong class='bad'>AeroAPI blocked: usage check failed.</strong>";
+    byId("headerUsage").textContent = "AeroAPI blocked: usage check failed.";
     showError("Usage check failed: " + String(e));
   }
 }
@@ -479,8 +484,21 @@ function operationalStatus(f,state){
   return "Planned";
 }
 function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || state.hsbFinished || f.delta < 0; }
-function dotClassFor(f,state){ if(state.hsbNotStarted)return"dot-blue"; if(isSafe(f,state))return"dot-green"; if(operationalStatus(f,state)==="Unknown")return"dot-grey"; if(f.delta<=30)return"dot-red"; return"dot-amber"; }
-function rowClassFor(f,state){ if(state.hsbNotStarted)return"row-pre"; if(isSafe(f,state))return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe"; if(f.delta<=30)return"row-critical"; return"row-live"; }
+function dotClassFor(f,state){
+  if (f.fs && f.fs.status === "no_live_refresh") return "dot-grey";
+  if(state.hsbNotStarted)return"dot-blue";
+  if(isSafe(f,state))return"dot-green";
+  if(operationalStatus(f,state)==="Unknown")return"dot-grey";
+  if(f.delta<=30)return"dot-red";
+  return"dot-amber";
+}
+function rowClassFor(f,state){
+  if (f.fs && f.fs.status === "no_live_refresh") return "";
+  if(state.hsbNotStarted)return"row-pre";
+  if(isSafe(f,state))return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe";
+  if(f.delta<=30)return"row-critical";
+  return"row-live";
+}
 function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
 function countdownText(f,state){ if(state.hsbNotStarted)return"HSB starts "+dur(state.hsbStartDelta); if(isSafe(f,state))return"Safe"; return dur(f.delta)+" left"; }
 
