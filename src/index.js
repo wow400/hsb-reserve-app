@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v16",
+    version: "v17",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v16",
+    version: "v17",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -89,6 +89,17 @@ async function handleStatus(request, env) {
     .split(",")
     .map(x => x.trim().toUpperCase())
     .filter(Boolean);
+
+  const meta = {};
+  try {
+    const metaParam = url.searchParams.get("meta");
+    if (metaParam) {
+      const parsedMeta = JSON.parse(metaParam);
+      if (parsedMeta && typeof parsedMeta === "object") {
+        for (const [k, v] of Object.entries(parsedMeta)) meta[String(k).toUpperCase()] = v;
+      }
+    }
+  } catch (_) {}
 
   if (!flights.length) return json({ ok: false, error: "No flights supplied" }, 400);
 
@@ -126,7 +137,7 @@ async function handleStatus(request, env) {
   for (const flight of uncached) {
     try {
       const data = await fetchAeroApi(flight, env.FLIGHTAWARE_API_KEY);
-      const mapped = mapAeroFlight(flight, data);
+      const mapped = mapAeroFlight(flight, data, meta[flight] || null);
       results[flight] = { ...mapped, cache: "miss" };
       await writeCache(env, flight, mapped);
       paidCalls++;
@@ -153,7 +164,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v16",
+    version: "v17",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -206,9 +217,9 @@ async function fetchAeroApi(flight, apiKey) {
   catch { throw new Error("AeroAPI returned non-JSON: " + body.slice(0, 120)); }
 }
 
-function mapAeroFlight(requestedFlight, data) {
+function mapAeroFlight(requestedFlight, data, expectedMeta) {
   const list = Array.isArray(data && data.flights) ? data.flights : [];
-  const best = pickBestRecord(requestedFlight, list);
+  const best = pickBestRecord(requestedFlight, list, expectedMeta);
   if (!best) return {
     flight: requestedFlight,
     found: false,
@@ -245,7 +256,7 @@ function mapAeroFlight(requestedFlight, data) {
   };
 }
 
-function pickBestRecord(requestedFlight, list) {
+function pickBestRecord(requestedFlight, list, expectedMeta) {
   if (!list.length) return null;
   const today = new Date().toISOString().slice(0, 10);
   const reqNum = requestedFlight.startsWith("BA") ? requestedFlight.slice(2).replace(/^0+/, "") : requestedFlight;
@@ -256,7 +267,19 @@ function pickBestRecord(requestedFlight, list) {
     return !ident || ident === requestedFlight || identNum === reqNum;
   });
 
-  const usable = candidates.length ? candidates : list;
+  let usable = candidates.length ? candidates : list;
+
+  if (expectedMeta && expectedMeta.from && expectedMeta.to) {
+    const from = String(expectedMeta.from).toUpperCase();
+    const to = String(expectedMeta.to).toUpperCase();
+    const routed = usable.filter(item => {
+      const origin = String((item.origin && (item.origin.code_iata || item.origin.code || item.origin.airport_code)) || "").toUpperCase();
+      const dest = String((item.destination && (item.destination.code_iata || item.destination.code || item.destination.airport_code)) || "").toUpperCase();
+      return (!origin || origin === from) && (!dest || dest === to);
+    });
+    if (routed.length) usable = routed;
+  }
+
   const todayish = usable.filter(item => {
     const t = item.scheduled_out || item.estimated_out || item.actual_out || item.scheduled_off || item.estimated_off || item.actual_off;
     return t && String(t).slice(0, 10) === today;
@@ -322,12 +345,16 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 .legend{display:flex;gap:18px;flex-wrap:wrap;padding:11px 14px;color:#c9d1d9;font-size:.88rem}.legend span{display:inline-flex;gap:7px;align-items:center}.note{padding:12px 14px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line)}
 .errorbox{display:none;padding:10px 14px;border:1px solid rgba(255,75,75,.5);background:rgba(255,75,75,.08);border-radius:12px;margin-bottom:12px;color:#ffb8b8}
 @media(max-width:800px){.header{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr 1fr}.fico-grid{grid-template-columns:1fr}table{font-size:.9rem;min-width:900px}.guard{grid-template-columns:1fr}}
+
+.live-badge{display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;background:rgba(65,212,90,.14);border:1px solid rgba(65,212,90,.55);color:#41d45a;font-size:.72rem;font-weight:900;vertical-align:2px}
+.calls-green{color:#41d45a;font-weight:900}.calls-amber{color:#ffc400;font-weight:900}.calls-red{color:#ff4b4b;font-weight:900}.cache-note{color:#a8b0bb}
+
 </style>
 </head>
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v16</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p></div>
+  <div><h1>HSB Reserve App <span class="version">v17</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -346,14 +373,29 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 var flights = [];
 var statuses = {};
 var usageGuard = null;
+var lastLiveRefreshAt = null;
 var HSB_TO_CHOCKS_LIMIT = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
 var COST_PER_FLIGHT_USD = 0.005;
-var STORAGE_KEY = "hsb-reserve-fico-v16";
+var STORAGE_KEY = "hsb-reserve-fico-v17";
 
 function byId(id){ return document.getElementById(id); }
 function showError(msg){ var el = byId("errorBox"); if(el){ el.style.display = "block"; el.textContent = msg; } }
 function money(n){ return "$" + Number(n || 0).toFixed(3); }
+function liveAgeText(){
+  if (!lastLiveRefreshAt) return "Not refreshed";
+  var secs = Math.max(0, Math.floor((Date.now() - lastLiveRefreshAt) / 1000));
+  if (secs < 60) return "Live (fresh)";
+  var mins = Math.floor(secs / 60);
+  return "Live (cached " + mins + " min ago)";
+}
+function updateLiveLine(){
+  var el = byId("liveLine");
+  if (!el) return;
+  if (!lastLiveRefreshAt) { el.textContent = "Not refreshed"; return; }
+  var d = new Date(lastLiveRefreshAt);
+  el.innerHTML = "<span class='live-badge'>LIVE</span> <span class='cache-note'>" + liveAgeText() + " — exact Zulu: " + String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z</span>";
+}
 function toMin(t){ var p = t.split(":").map(Number); return p[0] * 60 + p[1]; }
 function digitsOnly(s){ return String(s || "").split("").filter(function(c){ return c >= "0" && c <= "9"; }).join(""); }
 function compactToMin(s){ s = digitsOnly(s).padStart(4, "0"); return Number(s.slice(0,2))*60 + Number(s.slice(2,4)); }
@@ -373,17 +415,24 @@ function parseFico(text){
     var line = lines[i].trim();
     if (!line) continue;
     var parts = line.split(" ").filter(function(x){ return x.length > 0; });
-    if (parts.length < 6) continue;
+    if (parts.length < 5) continue;
     if (parts[0].indexOf("/") !== -1) continue;
     if (digitsOnly(parts[0]).length !== 3) continue;
     if (parts[1].indexOf("-") === -1) continue;
     var routeParts = parts[1].split("-");
     if (routeParts.length !== 2) continue;
-    var flight = "BA" + digitsOnly(parts[0]);
+    if (routeParts[0] !== "LHR") continue;
+    var flight = "BA" + digitsOnly(parts[0]).padStart(3, "0");
     var schedTO = compactToMin(parts[2]);
-    var schedArr = compactToMin(parts[5]);
+    var isFicoCancelled = parts.indexOf("X") !== -1;
+    var arrToken = null;
+    for (var j=3; j<parts.length; j++){
+      if (digitsOnly(parts[j]).length === 4) { arrToken = parts[j]; break; }
+    }
+    if (!arrToken) arrToken = "0000";
+    var schedArr = compactToMin(arrToken);
     if (schedArr <= schedTO) schedArr += 1440;
-    parsed.push({ flight: flight, from: routeParts[0], to: routeParts[1], route: parts[1], schedTO: schedTO, schedArr: schedArr, block: schedArr - schedTO });
+    parsed.push({ flight:flight, from:routeParts[0], to:routeParts[1], route:parts[1], schedTO:schedTO, schedArr:schedArr, block:schedArr-schedTO, ficoCancelled:isFicoCancelled });
   }
   return parsed.sort(function(a,b){ return a.schedTO - b.schedTO; });
 }
@@ -399,9 +448,13 @@ async function checkUsage(){
       byId("headerUsage").textContent = blockedLine;
       return;
     }
-    var usageLine = "AeroAPI guard active. Used this month: " + money(data.used_usd) + " / $" + Number(data.cap_usd).toFixed(2) + ". Remaining: " + money(data.remaining_usd) + ". Calls: " + data.calls + ". Cache: " + Math.round(data.cache_ttl_seconds/60) + " min.";
-    byId("usageGuard").innerHTML = "<strong class='ok'>" + usageLine + "</strong>";
-    byId("headerUsage").textContent = usageLine;
+    var callClass = "calls-green";
+    if (data.calls >= 1000 || data.remaining_usd <= 1) callClass = "calls-red";
+    else if (data.calls >= 100 || data.remaining_usd <= 3) callClass = "calls-amber";
+    var usageLineText = "AeroAPI guard active. Used this month: " + money(data.used_usd) + " / $" + Number(data.cap_usd).toFixed(2) + ". Remaining: " + money(data.remaining_usd) + ". Calls: " + data.calls + ". Cache: " + Math.round(data.cache_ttl_seconds/60) + " min.";
+    var usageLineHtml = "AeroAPI guard active. Used this month: " + money(data.used_usd) + " / $" + Number(data.cap_usd).toFixed(2) + ". Remaining: " + money(data.remaining_usd) + ". Calls: <span class='" + callClass + "'>" + data.calls + "</span>. Cache: " + Math.round(data.cache_ttl_seconds/60) + " min.";
+    byId("usageGuard").innerHTML = "<strong class='ok'>" + usageLineHtml + "</strong>";
+    byId("headerUsage").innerHTML = usageLineHtml;
   } catch(e) {
     usageGuard = null;
     byId("usageGuard").innerHTML = "<strong class='bad'>AeroAPI blocked: usage check failed.</strong>";
@@ -417,15 +470,23 @@ async function refreshStatus(){
     byId("parseNote").textContent = "Live refresh blocked: usage guard unavailable.";
     return;
   }
-  var estimated = flights.length * COST_PER_FLIGHT_USD;
-  var ok = confirm("Refresh live status for " + flights.length + " flights? Estimated maximum cost " + money(estimated) + ". Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
+  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled; }).length;
+  var estimated = refreshableCount * COST_PER_FLIGHT_USD;
+  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
   if (!ok) {
     byId("parseNote").textContent = "Live refresh cancelled. No AeroAPI calls made.";
     return;
   }
   try {
-    var query = flights.map(function(f){ return f.flight; }).join(",");
-    var res = await fetch("/api/status?flights=" + encodeURIComponent(query), { cache: "no-store" });
+    var refreshable = flights.filter(function(f){ return !f.ficoCancelled; });
+    if (!refreshable.length) {
+      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are already cancelled in FICO.";
+      return;
+    }
+    var meta = {};
+    refreshable.forEach(function(f){ meta[f.flight] = { from: f.from, to: f.to, schedTO: f.schedTO }; });
+    var query = refreshable.map(function(f){ return f.flight; }).join(",");
+    var res = await fetch("/api/status?flights=" + encodeURIComponent(query) + "&meta=" + encodeURIComponent(JSON.stringify(meta)), { cache: "no-store" });
     var data = await res.json();
     if (!data.ok) {
       byId("parseNote").textContent = "Live refresh blocked/error: " + (data.error || "unknown");
@@ -433,8 +494,10 @@ async function refreshStatus(){
       return;
     }
     statuses = data.flights || {};
-    byId("parseNote").textContent = "Updated: " + new Date(data.updated).toUTCString() + ". Paid calls: " + data.paid_calls_this_refresh + ". Cost: " + money(data.estimated_cost_this_refresh_usd) + ". Used this month: " + money(data.used_usd) + ".";
+    lastLiveRefreshAt = Date.parse(data.updated) || Date.now();
+    byId("parseNote").textContent = "Updated " + liveAgeText() + ". Paid calls: " + data.paid_calls_this_refresh + ". Cost: " + money(data.estimated_cost_this_refresh_usd) + ". Used this month: " + money(data.used_usd) + ".";
     await checkUsage();
+    updateLiveLine();
     render();
   } catch(e) {
     byId("parseNote").textContent = "Live status fetch failed: " + String(e);
@@ -447,7 +510,9 @@ function parseAndRender(){
   localStorage.setItem(STORAGE_KEY, text);
   flights = parseFico(text);
   statuses = {};
-  byId("parseNote").textContent = "Parsed " + flights.length + " flights. Estimated max refresh cost: " + money(flights.length * COST_PER_FLIGHT_USD) + ".";
+  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled; }).length;
+  var cancelledCount = flights.length - refreshableCount;
+  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
   render();
 }
 
@@ -469,7 +534,7 @@ function computeRows(){
     var callBy = Math.min(latestCall, hsbEnd);
     var callByReason = hsbEnd < latestCall ? "HSB finish" : "Latest call";
     var delta = futureDelta(callBy, now);
-    var fs = statuses[f.flight] || { status:"no_live_refresh", found:false, label:null, safe_by_status:false };
+    var fs = f.ficoCancelled ? { status:"cancelled", found:true, label:"Cancelled", safe_by_status:true, source:"fico" } : (statuses[f.flight] || { status:"no_live_refresh", found:false, label:null, safe_by_status:false });
     return Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs });
   });
   return { rows:rows, hsbStart:hsbStart, hsbEnd:hsbEnd, latestOnBlocks:latestOnBlocks, now:now, hsbStartDelta:hsbStartDelta, hsbFinishDelta:hsbFinishDelta, hsbNotStarted:hsbNotStarted, hsbFinished:hsbFinished };
@@ -500,7 +565,11 @@ function rowClassFor(f,state){
   return"row-live";
 }
 function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
-function countdownText(f,state){ if(state.hsbNotStarted)return"HSB starts "+dur(state.hsbStartDelta); if(isSafe(f,state))return"Safe"; return dur(f.delta)+" left"; }
+function countdownText(f,state){
+  if(isSafe(f,state))return"Safe";
+  if(f.delta < 0)return"Expired";
+  return dur(f.delta);
+}
 
 function todayIso(){ return new Date().toISOString().slice(0,10); }
 function flightNumberOnly(flight){ return digitsOnly(String(flight || "").startsWith("BA") ? String(flight).slice(2) : flight); }
@@ -511,6 +580,7 @@ function checksHtml(flight){ return "<div class='checks'><a class='check-link ba
 
 function render(){
   byId("utcClock").textContent = utcNowText();
+  updateLiveLine();
   var state = computeRows();
   if (!state) return;
   var rowsEl = byId("rows");
