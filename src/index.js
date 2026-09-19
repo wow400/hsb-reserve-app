@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v20",
+    version: "v22",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v20",
+    version: "v22",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -164,7 +164,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v20",
+    version: "v22",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -299,17 +299,18 @@ function classifyRecord(f) {
   if (s.includes("cancel")) return { status: "cancelled", label: "Cancelled", safe_by_status: true, confidence: "confirmed" };
   if (s.includes("divert")) return { status: "diverted", label: "Diverted", safe_by_status: true, confidence: "confirmed" };
 
-  const departedEvidence = Boolean(f.actual_out || f.actual_off || f.actual_on || f.actual_in);
+  const departedEvidence = Boolean(f.actual_off || f.actual_on || f.actual_in);
   if (departedEvidence || s.includes("departed") || s.includes("airborne") || s.includes("en route") || s.includes("enroute") || s.includes("arrived") || s.includes("landed")) {
     return { status: "departed", label: "Departed", safe_by_status: true, confidence: "confirmed" };
   }
 
   const scheduled = Date.parse(f.scheduled_out || f.scheduled_off || "");
   const estimated = Date.parse(f.estimated_out || f.estimated_off || "");
-  const pastStd = scheduled && Date.now() > scheduled;
   const estimatedLate = scheduled && estimated && estimated > scheduled;
 
-  if (s.includes("delay") || pastStd || estimatedLate) return { status: "delayed", label: "Delayed", safe_by_status: false, confidence: "aeroapi" };
+  // Do not infer a delay merely because STD has passed. Require explicit
+  // AeroAPI delay status or a later estimated departure time.
+  if (s.includes("delay") || estimatedLate) return { status: "delayed", label: "Delayed", safe_by_status: false, confidence: "aeroapi" };
   if (scheduled || s.includes("scheduled") || s.includes("planned")) return { status: "planned", label: "Planned", safe_by_status: false, confidence: "aeroapi" };
 
   return { status: "unknown", label: "Unknown", safe_by_status: false, confidence: "unknown" };
@@ -317,6 +318,15 @@ function classifyRecord(f) {
 
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function quarterHourOptions(selected) {
+  let out = "";
+  for (let m = 0; m < 1440; m += 15) {
+    const value = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+    out += `<option value="${value}"${value === selected ? " selected" : ""}>${value}</option>`;
+  }
+  return out;
 }
 
 function renderHtml() {
@@ -333,7 +343,7 @@ body{margin:0;padding:14px;background:radial-gradient(circle at top,#101923 0,#0
 .app{max-width:1220px;margin:0 auto;padding:8px 0 24px}
 .header{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;margin-bottom:12px}
 h1{margin:0;font-size:1.65rem}.version{font-size:.78rem;background:#102742;color:#80bdff;border:1px solid #1e4774;border-radius:8px;padding:4px 7px;margin-left:8px;vertical-align:4px}.sub{margin:6px 0 0;color:var(--muted);font-size:.95rem}
-.controls{display:grid;grid-template-columns:120px 120px 140px;gap:8px}.control{background:linear-gradient(#101923,#0a1017);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.control label{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase;margin-bottom:4px}.control input{width:100%;border:0;background:transparent;color:var(--blue);font-weight:900;font-size:1.18rem;text-align:center}.clock{font-weight:900;font-size:1.28rem;color:#fff}
+.controls{display:grid;grid-template-columns:120px 120px 140px;gap:8px}.control{background:linear-gradient(#101923,#0a1017);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.control label{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase;margin-bottom:4px}.control input,select{width:100%;border:0;background:transparent;color:var(--blue);font-weight:900;font-size:1.18rem;text-align:center}.clock{font-weight:900;font-size:1.28rem;color:#fff}
 .card{background:rgba(11,17,24,.94);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.28);overflow:hidden;margin-bottom:12px}.guard{padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.ok{color:var(--green)!important}.bad{color:var(--red)!important}
 .fico{padding:14px 16px}.fico-grid{display:grid;grid-template-columns:1fr 230px;gap:14px}.fico label{display:block;color:var(--ink);font-weight:900;font-size:.82rem;margin-bottom:6px}textarea{width:100%;min-height:130px;background:#f9fbff;color:#111;border:1px solid #cfd7e2;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.25}.button-col{display:flex;flex-direction:column;gap:10px}
 button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}button.danger{border-color:#765025;color:#ffc400}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
@@ -354,8 +364,8 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v20</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
-  <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><input id="hsbStart" type="time" value="12:00"></div><div class="control"><label for="hsbEnd">HSB finish</label><input id="hsbEnd" type="time" value="20:00"></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px">FICO reminder: <strong>DP LHR b8 l8 u8 v8 w8</strong> = 787 · <strong>DP LHR a8</strong> = A380</p></div>
+  <div><h1>HSB Reserve App <span class="version">v22</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
 <section class="card guard" style="display:none"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
@@ -381,6 +391,7 @@ var COST_PER_FLIGHT_USD = 0.005;
 var STORAGE_KEY = "hsb-reserve-fico-current";
 var HSB_START_KEY = "hsb-reserve-hsb-start";
 var HSB_END_KEY = "hsb-reserve-hsb-finish";
+var DEPARTED_STORE_KEY = "hsb-reserve-confirmed-airborne-v1";
 
 function byId(id){ return document.getElementById(id); }
 function showError(msg){ var el = byId("errorBox"); if(el){ el.style.display = "block"; el.textContent = msg; } }
@@ -414,6 +425,38 @@ function cannotCoverFromHsb(f, hsbStart){
   var arrival = f.schedArr;
   while (arrival < hsbStart) arrival += 1440;
   return (arrival - hsbStart) >= CANNOT_COVER_AFTER_HSB_START;
+}
+
+function isConfirmedAirborneOrBeyond(fs){
+  if (!fs) return false;
+  if (fs.actual_off || fs.actual_on || fs.actual_in) return true;
+  var raw = String(fs.raw_status || "").toLowerCase();
+  return raw.indexOf("airborne") !== -1 || raw.indexOf("en route") !== -1 || raw.indexOf("enroute") !== -1 || raw.indexOf("arrived") !== -1 || raw.indexOf("landed") !== -1;
+}
+function readDepartedStore(){
+  var today = todayIso();
+  try {
+    var raw = localStorage.getItem(DEPARTED_STORE_KEY);
+    var parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && parsed.date === today && parsed.flights && typeof parsed.flights === "object") return parsed;
+  } catch (_) {}
+  return { date: today, flights: {} };
+}
+function writeDepartedStore(store){
+  try { localStorage.setItem(DEPARTED_STORE_KEY, JSON.stringify(store)); } catch (_) {}
+}
+function rememberConfirmedAirborne(f, fs){
+  if (!f || !isConfirmedAirborneOrBeyond(fs)) return;
+  var store = readDepartedStore();
+  store.flights[flightIdentity(f)] = fs;
+  writeDepartedStore(store);
+}
+function restoredConfirmedAirborne(f){
+  var store = readDepartedStore();
+  return store.flights[flightIdentity(f)] || null;
+}
+function alreadyConfirmedAirborne(f){
+  return isConfirmedAirborneOrBeyond(statuses[f.flight]);
 }
 
 function parseFico(text){
@@ -479,18 +522,18 @@ async function refreshStatus(){
     return;
   }
   var hsbStartForRefresh = toMin(byId("hsbStart").value);
-  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh); }).length;
+  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh) && !alreadyConfirmedAirborne(f); }).length;
   var estimated = refreshableCount * COST_PER_FLIGHT_USD;
-  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled and cannot-cover flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
+  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled, cannot-cover and confirmed taken-off flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
   if (!ok) {
     byId("parseNote").textContent = "Live refresh cancelled. No AeroAPI calls made.";
     return;
   }
   try {
     var hsbStartForRefresh = toMin(byId("hsbStart").value);
-    var refreshable = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh); });
+    var refreshable = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh) && !alreadyConfirmedAirborne(f); });
     if (!refreshable.length) {
-      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are cancelled or cannot be covered from this HSB.";
+      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are cancelled, cannot be covered from this HSB, or are already confirmed taken off.";
       return;
     }
     var meta = {};
@@ -503,7 +546,14 @@ async function refreshStatus(){
       if (data.error) showError(data.error);
       return;
     }
-    statuses = data.flights || {};
+    var returnedStatuses = data.flights || {};
+    var mergedStatuses = {};
+    flights.forEach(function(f){
+      if (statuses[f.flight]) mergedStatuses[f.flight] = statuses[f.flight];
+      if (returnedStatuses[f.flight]) mergedStatuses[f.flight] = returnedStatuses[f.flight];
+    });
+    statuses = mergedStatuses;
+    flights.forEach(function(f){ rememberConfirmedAirborne(f, statuses[f.flight]); });
     lastLiveRefreshAt = Date.parse(data.updated) || Date.now();
     byId("parseNote").textContent = "Updated " + liveAgeText() + ". Paid calls: " + data.paid_calls_this_refresh + ". Cost: " + money(data.estimated_cost_this_refresh_usd) + ". Used this month: " + money(data.used_usd) + ".";
     await checkUsage();
@@ -515,16 +565,38 @@ async function refreshStatus(){
   }
 }
 
+function flightIdentity(f){
+  return [f.flight, f.route, f.schedTO, f.schedArr, f.ficoCancelled ? "X" : ""].join("|");
+}
+function compactFicoText(text){
+  return String(text || "").split(/\r?\n/).filter(function(line){ return line.trim().length > 0; }).join("\n");
+}
 function parseAndRender(){
-  var text = byId("ficoInput").value;
+  var text = compactFicoText(byId("ficoInput").value);
+  byId("ficoInput").value = text;
   localStorage.setItem(STORAGE_KEY, text);
-  flights = parseFico(text);
-  statuses = {};
+  var oldByFlight = {};
+  flights.forEach(function(f){ oldByFlight[f.flight] = f; });
+  var oldStatuses = statuses;
+  var nextFlights = parseFico(text);
+  var nextStatuses = {};
+  nextFlights.forEach(function(f){
+    var old = oldByFlight[f.flight];
+    if (old && flightIdentity(old) === flightIdentity(f) && oldStatuses[f.flight]) {
+      nextStatuses[f.flight] = oldStatuses[f.flight];
+    } else {
+      var restored = restoredConfirmedAirborne(f);
+      if (restored) nextStatuses[f.flight] = restored;
+    }
+  });
+  flights = nextFlights;
+  statuses = nextStatuses;
   var hsbStartForSummary = toMin(byId("hsbStart").value);
   var cancelledCount = flights.filter(function(f){ return f.ficoCancelled; }).length;
   var cannotCoverCount = flights.filter(function(f){ return !f.ficoCancelled && cannotCoverFromHsb(f, hsbStartForSummary); }).length;
-  var refreshableCount = flights.length - cancelledCount - cannotCoverCount;
-  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. " + cannotCoverCount + " cannot cover. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
+  var airborneCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForSummary) && alreadyConfirmedAirborne(f); }).length;
+  var refreshableCount = flights.length - cancelledCount - cannotCoverCount - airborneCount;
+  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. " + cannotCoverCount + " cannot cover. " + airborneCount + " already taken off. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
   render();
 }
 
@@ -562,11 +634,11 @@ function scheduledEtdPassed(f,state){
 }
 function operationalStatus(f,state){
   if (f.fs && f.fs.safe_by_status) return f.fs.label || "Departed";
-  if (f.cannotCoverFromThisHsb) return "Cannot cover";
+  if (f.cannotCoverFromThisHsb) return ">19h from HSB";
   if (state.hsbFinished || f.delta < 0) return "Safe";
   if (apiHasUsefulStatus(f)) return f.fs.label;
   if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "Past ETD — refresh";
-  if (state.now >= f.schedTO) return "Delayed";
+  if (state.now >= f.schedTO) return "Unknown";
   return "Planned";
 }
 function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || f.cannotCoverFromThisHsb || state.hsbFinished || f.delta < 0; }
@@ -589,11 +661,28 @@ function rowClassFor(f,state){
   if(f.delta<=30)return"row-critical";
   return"row-live";
 }
-function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-action"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s==="Cannot cover")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
+function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-action"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s===">19h from HSB")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
 function countdownText(f,state){
   if(isSafe(f,state))return"Safe";
   if(f.delta < 0)return"Expired";
   return dur(f.delta);
+}
+function liveDepartureDetails(f){
+  if (!f.fs || !f.fs.found) return "";
+  var scheduled = Date.parse(f.fs.scheduled_out || f.fs.scheduled_off || "");
+  var estimatedIso = f.fs.estimated_out || f.fs.estimated_off || "";
+  var estimated = Date.parse(estimatedIso);
+  if (!scheduled || !estimated || estimated <= scheduled) return "";
+  var delayMins = Math.max(1, Math.round((estimated - scheduled) / 60000));
+  var d = new Date(estimated);
+  var newEtd = String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z";
+  return "Delayed " + delayMins + "m<span class='small'>New ETD " + newEtd + "</span>";
+}
+function statusHtml(f,state){
+  var op = operationalStatus(f,state);
+  if (op !== "Delayed") return op;
+  var details = liveDepartureDetails(f);
+  return details || op;
 }
 
 function todayIso(){ return new Date().toISOString().slice(0,10); }
@@ -623,7 +712,7 @@ function render(){
       "<td>" + fmtShort(f.schedArr) + "</td>" +
       "<td>" + minToBlock(f.block) + "</td>" +
       "<td><span class='badge " + callBadge + "'>" + fmt(f.callBy) + "</span><span class='small'>" + f.callByReason + "</span></td>" +
-      "<td class='" + statusClass(f,state) + "'>" + operationalStatus(f,state) + "</td>" +
+      "<td class='" + statusClass(f,state) + "'>" + statusHtml(f,state) + "</td>" +
       "<td>" + countdownText(f,state) + "</td>" +
       "<td>" + checksHtml(f.flight) + "</td>";
     rowsEl.appendChild(tr);
