@@ -1,13 +1,19 @@
-# HSB Reserve App v24
+# HSB Reserve App v25
 
-Built from the working v23 source.
+Built from the working v24 source.
 
-Changes in v24:
-- Fixes FICO parsing when the ETD field contains a revised departure such as `R1430`.
-- Revised ETD tokens are no longer mistaken for PTA/arrival.
-- Example: `269 LHR-LAX 1405 R1430 0120 ...` now remains scheduled T/O `1405`, arrival `0120 +1`, block `11:15`.
+Changes in v25:
+- Adds server-side current-session persistence using the existing Cloudflare `USAGE_KV` binding.
+- The latest same-day HSB session is shared between the Home Screen web app, Safari, and other browsers/devices opening the same Worker URL.
+- Persists FICO text, parsed flights, HSB start/finish, FlightAware statuses, delay/New ETD information, confirmed-airborne state via saved statuses, and last live-refresh time.
+- On startup, today's Cloudflare session is preferred over browser-local storage, so stale Safari/Home Screen local state does not override the latest saved server state.
+- If there is no server snapshot yet, the app falls back to the existing local storage and then seeds Cloudflare with that state.
+- Session data is keyed to the UTC date; yesterday's flight/live state is not restored on a new UTC day.
+- Session snapshots expire automatically after 3 days.
+- A final page-close save is attempted so closing the Home Screen app immediately after a change does not normally lose the latest state.
 
-Changes retained from v23/v22/v21:
+Changes retained from v24/v23/v22/v21:
+- Correct FICO parsing when the ETD field contains a revised departure such as `R1430`.
 - A380-only FICO reminder: `DP LHR a8`.
 - HSB start/finish in 15-minute increments.
 - FICO blank-line compaction.
