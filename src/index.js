@@ -15,6 +15,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/debug") return handleDebug(env);
     if (url.pathname === "/api/usage") return handleUsage(env);
+    if (url.pathname === "/api/session") return handleSession(request, env);
     if (url.pathname === "/api/status") return handleStatus(request, env);
 
     return new Response(renderHtml(), {
@@ -49,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v24",
+    version: "v25",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v24",
+    version: "v25",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -74,6 +75,82 @@ async function handleUsage(env) {
     cost_per_flight_usd: COST_PER_FLIGHT_USD,
     cache_ttl_seconds: CACHE_TTL_SECONDS
   });
+}
+
+function utcDateKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sessionKey() {
+  return "session:" + utcDateKey();
+}
+
+async function handleSession(request, env) {
+  if (!env.USAGE_KV) {
+    return json({ ok: false, error: "Missing USAGE_KV binding" }, 500);
+  }
+
+  if (request.method === "GET") {
+    const stored = await env.USAGE_KV.get(sessionKey(), "json");
+    if (!stored || stored.date !== utcDateKey() || !stored.session) {
+      return json({ ok: true, version: "v25", date: utcDateKey(), session: null });
+    }
+    return json({
+      ok: true,
+      version: "v25",
+      date: utcDateKey(),
+      saved_at: stored.saved_at || null,
+      session: stored.session
+    });
+  }
+
+  if (request.method === "POST") {
+    let body;
+    try {
+      body = await request.json();
+    } catch (_) {
+      return json({ ok: false, error: "Invalid JSON body" }, 400);
+    }
+
+    if (!body || typeof body !== "object" || !body.session || typeof body.session !== "object") {
+      return json({ ok: false, error: "Missing session object" }, 400);
+    }
+
+    const session = body.session;
+    const encoded = JSON.stringify(session);
+    if (encoded.length > 100000) {
+      return json({ ok: false, error: "Session snapshot too large" }, 413);
+    }
+
+    const ficoText = typeof session.ficoText === "string" ? session.ficoText.slice(0, 20000) : "";
+    const hsbStart = typeof session.hsbStart === "string" && /^\d{2}:\d{2}$/.test(session.hsbStart) ? session.hsbStart : "12:00";
+    const hsbEnd = typeof session.hsbEnd === "string" && /^\d{2}:\d{2}$/.test(session.hsbEnd) ? session.hsbEnd : "20:00";
+    const flights = Array.isArray(session.flights) ? session.flights.slice(0, 100) : [];
+    const statuses = session.statuses && typeof session.statuses === "object" ? session.statuses : {};
+    const lastLiveRefreshAt = Number.isFinite(Number(session.lastLiveRefreshAt)) ? Number(session.lastLiveRefreshAt) : null;
+    const nowIso = new Date().toISOString();
+
+    const clean = {
+      date: utcDateKey(),
+      ficoText,
+      hsbStart,
+      hsbEnd,
+      flights,
+      statuses,
+      lastLiveRefreshAt,
+      clientSavedAt: typeof session.clientSavedAt === "string" ? session.clientSavedAt : null
+    };
+
+    await env.USAGE_KV.put(sessionKey(), JSON.stringify({
+      date: utcDateKey(),
+      saved_at: nowIso,
+      session: clean
+    }), { expirationTtl: 60 * 60 * 24 * 3 });
+
+    return json({ ok: true, version: "v25", date: utcDateKey(), saved_at: nowIso });
+  }
+
+  return json({ ok: false, error: "Method not allowed" }, 405);
 }
 
 async function handleStatus(request, env) {
@@ -164,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v24",
+    version: "v25",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -364,7 +441,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v24</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v25</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -392,6 +469,10 @@ var STORAGE_KEY = "hsb-reserve-fico-current";
 var HSB_START_KEY = "hsb-reserve-hsb-start";
 var HSB_END_KEY = "hsb-reserve-hsb-finish";
 var DEPARTED_STORE_KEY = "hsb-reserve-confirmed-airborne-v1";
+var SESSION_SAVE_DELAY_MS = 350;
+var sessionReady = false;
+var sessionSaveTimer = null;
+var sessionSaveSerial = Promise.resolve();
 
 function byId(id){ return document.getElementById(id); }
 function showError(msg){ var el = byId("errorBox"); if(el){ el.style.display = "block"; el.textContent = msg; } }
@@ -457,6 +538,82 @@ function restoredConfirmedAirborne(f){
 }
 function alreadyConfirmedAirborne(f){
   return isConfirmedAirborneOrBeyond(statuses[f.flight]);
+}
+
+function sessionSnapshot(){
+  return {
+    date: todayIso(),
+    ficoText: byId("ficoInput").value || "",
+    hsbStart: byId("hsbStart").value || "12:00",
+    hsbEnd: byId("hsbEnd").value || "20:00",
+    flights: flights,
+    statuses: statuses,
+    lastLiveRefreshAt: lastLiveRefreshAt,
+    clientSavedAt: new Date().toISOString()
+  };
+}
+function queueSaveSession(){
+  if (!sessionReady) return;
+  if (sessionSaveTimer) clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = setTimeout(function(){
+    sessionSaveTimer = null;
+    saveSessionToServer();
+  }, SESSION_SAVE_DELAY_MS);
+}
+function saveSessionToServer(){
+  if (!sessionReady) return Promise.resolve();
+  var payload = { session: sessionSnapshot() };
+  sessionSaveSerial = sessionSaveSerial.catch(function(){}).then(async function(){
+    try {
+      var res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        cache: "no-store"
+      });
+      var data = await res.json();
+      if (!data.ok) throw new Error(data.error || "session save failed");
+    } catch (e) {
+      console.warn("Session save failed", e);
+    }
+  });
+  return sessionSaveSerial;
+}
+function saveSessionOnPageHide(){
+  if (!sessionReady) return;
+  try {
+    var body = JSON.stringify({ session: sessionSnapshot() });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/api/session", new Blob([body], { type: "application/json" }));
+      return;
+    }
+    fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: body, keepalive: true, cache: "no-store" }).catch(function(){});
+  } catch (_) {}
+}
+
+async function loadSessionFromServer(){
+  try {
+    var res = await fetch("/api/session", { cache: "no-store" });
+    var data = await res.json();
+    if (data && data.ok && data.session && data.date === todayIso()) return data.session;
+  } catch (e) {
+    console.warn("Session load failed", e);
+  }
+  return null;
+}
+function restoreStatusesFromSession(snapshot){
+  if (!snapshot || !snapshot.statuses || !snapshot.flights) return;
+  var savedFlights = {};
+  snapshot.flights.forEach(function(f){ if (f && f.flight) savedFlights[f.flight] = f; });
+  flights.forEach(function(f){
+    var old = savedFlights[f.flight];
+    if (old && flightIdentity(old) === flightIdentity(f) && snapshot.statuses[f.flight]) {
+      statuses[f.flight] = snapshot.statuses[f.flight];
+      rememberConfirmedAirborne(f, statuses[f.flight]);
+    }
+  });
+  var savedRefresh = Number(snapshot.lastLiveRefreshAt);
+  lastLiveRefreshAt = Number.isFinite(savedRefresh) && savedRefresh > 0 ? savedRefresh : null;
 }
 
 function parseFico(text){
@@ -561,6 +718,7 @@ async function refreshStatus(){
     await checkUsage();
     updateLiveLine();
     render();
+    queueSaveSession();
   } catch(e) {
     byId("parseNote").textContent = "Live status fetch failed: " + String(e);
     showError("Live status fetch failed: " + String(e));
@@ -600,6 +758,7 @@ function parseAndRender(){
   var refreshableCount = flights.length - cancelledCount - cannotCoverCount - airborneCount;
   byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. " + cannotCoverCount + " cannot cover. " + airborneCount + " already taken off. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
   render();
+  queueSaveSession();
 }
 
 function computeRows(){
@@ -721,32 +880,56 @@ function render(){
   }
 }
 
-function start(){
+async function start(){
   byId("parseBtn").addEventListener("click", parseAndRender);
   byId("statusBtn").addEventListener("click", refreshStatus);
   byId("usageBtn").addEventListener("click", checkUsage);
   byId("hsbStart").addEventListener("input", function(){
     localStorage.setItem(HSB_START_KEY, byId("hsbStart").value);
     render();
+    queueSaveSession();
   });
   byId("hsbEnd").addEventListener("input", function(){
     localStorage.setItem(HSB_END_KEY, byId("hsbEnd").value);
     render();
+    queueSaveSession();
   });
-  var savedStart = localStorage.getItem(HSB_START_KEY);
-  var savedEnd = localStorage.getItem(HSB_END_KEY);
-  if (savedStart) byId("hsbStart").value = savedStart;
-  if (savedEnd) byId("hsbEnd").value = savedEnd;
+  byId("ficoInput").addEventListener("input", function(){
+    try { localStorage.setItem(STORAGE_KEY, byId("ficoInput").value); } catch (_) {}
+    queueSaveSession();
+  });
+  window.addEventListener("pagehide", saveSessionOnPageHide);
 
-  var saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) byId("ficoInput").value = saved;
-  parseAndRender();
+  var remote = await loadSessionFromServer();
+  if (remote) {
+    if (remote.hsbStart) byId("hsbStart").value = remote.hsbStart;
+    if (remote.hsbEnd) byId("hsbEnd").value = remote.hsbEnd;
+    if (typeof remote.ficoText === "string" && remote.ficoText.length) byId("ficoInput").value = remote.ficoText;
+    try {
+      localStorage.setItem(HSB_START_KEY, byId("hsbStart").value);
+      localStorage.setItem(HSB_END_KEY, byId("hsbEnd").value);
+      localStorage.setItem(STORAGE_KEY, byId("ficoInput").value);
+    } catch (_) {}
+    parseAndRender();
+    restoreStatusesFromSession(remote);
+    render();
+  } else {
+    var savedStart = localStorage.getItem(HSB_START_KEY);
+    var savedEnd = localStorage.getItem(HSB_END_KEY);
+    if (savedStart) byId("hsbStart").value = savedStart;
+    if (savedEnd) byId("hsbEnd").value = savedEnd;
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) byId("ficoInput").value = saved;
+    parseAndRender();
+  }
+
+  sessionReady = true;
+  queueSaveSession();
   checkUsage();
   setInterval(render, 10000);
 }
 
-try { start(); }
-catch(e) { showError("Frontend startup error: " + String(e)); byId("utcClock").textContent = "ERROR"; }
+start().catch(function(e){ showError("Frontend startup error: " + String(e)); byId("utcClock").textContent = "ERROR"; });
 })();
 </script>
 </body>
