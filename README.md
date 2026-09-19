@@ -1,8 +1,8 @@
-# HSB Reserve App v22
+# HSB Reserve App v23
 
 Built cleanly from the known-good v21 source.
 
-Changes in v22:
+Changes in v23:
 - Once FlightAware confirms a flight has actually taken off (wheels-off / airborne-or-beyond evidence), later **Refresh live status** actions skip that flight, so no further AeroAPI credits are spent on it.
 - Confirmed taken-off state is retained for the same flight/schedule for the rest of the UTC day, including across FICO re-parses and page reloads.
 - The refresh confirmation and cost estimate exclude confirmed taken-off flights.
@@ -20,3 +20,8 @@ Changes retained from v21:
 - BA/LHR/FA external checks.
 
 Crew-duty/FDP calculations are intentionally not included.
+
+
+## v23
+- Fixes browser JavaScript startup caused by newline-regex escaping in v22.
+- Restores UTC clock, FICO parsing, saved HSB times, usage guard, and live-refresh controls.
