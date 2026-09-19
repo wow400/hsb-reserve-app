@@ -49,7 +49,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v23",
+    version: "v24",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -65,7 +65,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v23",
+    version: "v24",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -164,7 +164,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v23",
+    version: "v24",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -364,7 +364,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v23</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v24</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -478,7 +478,9 @@ function parseFico(text){
     var isFicoCancelled = parts.indexOf("X") !== -1;
     var arrToken = null;
     for (var j=3; j<parts.length; j++){
-      if (digitsOnly(parts[j]).length === 4) { arrToken = parts[j]; break; }
+      // PTA is a plain four-digit time. Revised ETDs such as R1430 are
+      // deliberately ignored here so they cannot be mistaken for arrival.
+      if (parts[j].length === 4 && digitsOnly(parts[j]) === parts[j]) { arrToken = parts[j]; break; }
     }
     if (!arrToken) arrToken = "0000";
     var schedArr = compactToMin(arrToken);
