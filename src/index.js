@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v25",
+    version: "v27",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v25",
+    version: "v27",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v25", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v27", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v25",
+      version: "v27",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v25", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v27", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v25",
+    version: "v27",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -424,14 +424,15 @@ h1{margin:0;font-size:1.65rem}.version{font-size:.78rem;background:#102742;color
 .card{background:rgba(11,17,24,.94);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.28);overflow:hidden;margin-bottom:12px}.guard{padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.ok{color:var(--green)!important}.bad{color:var(--red)!important}
 .fico{padding:14px 16px}.fico-grid{display:grid;grid-template-columns:1fr 230px;gap:14px}.fico label{display:block;color:var(--ink);font-weight:900;font-size:.82rem;margin-bottom:6px}textarea{width:100%;min-height:130px;background:#f9fbff;color:#111;border:1px solid #cfd7e2;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.25}.button-col{display:flex;flex-direction:column;gap:10px}
 button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}button.danger{border-color:#765025;color:#ffc400}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
-.table-scroll{overflow-x:auto}table{width:100%;min-width:930px;border-collapse:collapse;font-size:.95rem}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;white-space:nowrap;vertical-align:middle}th{background:#111922;color:#c9d1d9;font-size:.78rem;font-weight:900}td{color:#eef3f8}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}table{width:100%;min-width:1120px;border-collapse:collapse;font-size:.88rem}th,td{border-bottom:1px solid var(--line);padding:7px 5px;text-align:left;white-space:nowrap;vertical-align:middle}th{background:#111922;color:#c9d1d9;font-size:.73rem;font-weight:900}td{color:#eef3f8}
 .badge{font-weight:900;border-radius:8px;display:inline-block;padding:3px 7px}.badge-green{background:rgba(65,212,90,.14);color:var(--green)}.badge-amber{background:rgba(255,196,0,.14);color:var(--amber)}.small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
 .status-planned{color:var(--amber);font-weight:900}.status-delayed{color:var(--amber);font-weight:900}.status-action{color:var(--red);font-weight:900}.status-safe{color:var(--green);font-weight:900}.status-unknown{color:var(--grey);font-weight:900}.row-safe{background:rgba(65,212,90,.06)}.row-pre{background:rgba(88,166,255,.07)}.row-live{background:rgba(255,196,0,.06)}.row-critical{background:rgba(255,75,75,.12)}.row-departed{background:rgba(255,255,255,.035)}
 .dot{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:-4px;box-shadow:inset 0 2px 3px rgba(255,255,255,.85),inset 0 -3px 5px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.5)}.dot-green{background:linear-gradient(#83ff83,#0cad2a)}.dot-amber{background:linear-gradient(#ffd56a,#ff9800)}.dot-red{background:linear-gradient(#ff7777,#d60000)}.dot-blue{background:linear-gradient(#7db7ff,#1b64d8)}.dot-grey{background:linear-gradient(#eee,#9aa3ad)}
 .checks{display:flex;gap:6px}.check-link{display:inline-block;text-decoration:none;background:#05080c;border:1px solid #244b78;padding:5px 7px;border-radius:7px;font-size:.78rem;font-weight:900;line-height:1}.check-link.ba{color:#fff;border-color:#555}.check-link.lhr{color:#d8b4ff;border-color:#5b3f85}.check-link.fa{color:#74b9ff;border-color:#244b78}
-.legend{display:flex;gap:18px;flex-wrap:wrap;padding:11px 14px;color:#c9d1d9;font-size:.88rem}.legend span{display:inline-flex;gap:7px;align-items:center}.note{padding:12px 14px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;color:#c9d1d9;font-size:.82rem}.legend span{display:inline-flex;gap:6px;align-items:center}.note{padding:10px 12px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--line);line-height:1.35}
 .errorbox{display:none;padding:10px 14px;border:1px solid rgba(255,75,75,.5);background:rgba(255,75,75,.08);border-radius:12px;margin-bottom:12px;color:#ffb8b8}
-@media(max-width:800px){.header{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr 1fr}.fico-grid{grid-template-columns:1fr}table{font-size:.9rem;min-width:900px}.guard{grid-template-columns:1fr}}
+@media(max-width:800px){body{padding:7px}.app{padding-top:4px}.header{grid-template-columns:1fr;gap:8px;margin-bottom:8px}h1{font-size:1.42rem}.sub{font-size:.82rem;line-height:1.3}.controls{grid-template-columns:1fr 1fr 1fr;gap:5px}.control{padding:7px 5px}.control label{font-size:.62rem}.control input,select{font-size:1rem}.clock{font-size:1.08rem}.fico{padding:10px}.fico-grid{grid-template-columns:1fr;gap:9px}textarea{min-height:92px;font-size:.74rem;padding:8px}.button-col{gap:8px}button{padding:10px;font-size:.86rem}.parse-note{font-size:.74rem;margin-top:2px}.guard{grid-template-columns:1fr}.table-scroll{margin:0}table{font-size:.76rem;min-width:1080px}th,td{padding:6px 4px}th{font-size:.66rem}.dot{width:15px;height:15px}.checks{gap:4px}.check-link{padding:4px 5px;font-size:.7rem}.badge{padding:2px 5px}.legend{gap:10px;padding:9px 10px;font-size:.74rem}.note{font-size:.72rem;padding:9px 10px}}
+@media(max-width:480px){body{padding:5px}.controls{gap:4px}.control{padding:6px 3px}.fico{padding:8px}textarea{min-height:82px}.table-scroll{border-top:1px solid var(--line)}table{font-size:.72rem;min-width:1040px}th,td{padding:5px 3px}.legend{gap:8px}.legend .dot{width:14px;height:14px}}
 
 .live-badge{display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;background:rgba(65,212,90,.14);border:1px solid rgba(65,212,90,.55);color:#41d45a;font-size:.72rem;font-weight:900;vertical-align:2px}
 .calls-green{color:#41d45a;font-weight:900}.calls-amber{color:#ffc400;font-weight:900}.calls-red{color:#ff4b4b;font-weight:900}.cache-note{color:#a8b0bb}
@@ -441,16 +442,16 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v25</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v27</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
 <section class="card guard" style="display:none"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
 <section class="card fico"><div class="fico-grid"><div><label for="ficoInput">Paste BA/FICO flight list</label><textarea id="ficoInput" spellcheck="false">${esc(DEFAULT_FICO)}</textarea></div><div class="button-col"><button class="primary" id="parseBtn">Parse FICO list</button><button class="danger" id="statusBtn">Refresh live status</button><div id="parseNote" class="parse-note">No automatic paid polling.</div></div></div></section>
 <section class="card">
-  <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
-  <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable</span><span><i class="dot dot-red"></i> Action required</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown</span></div>
-  <div class="note">Call by = earlier of latest legal call time or HSB finish. Green = safe from this HSB. Amber = still in play. Red = past ETD / refresh needed. Grey = not live refreshed or unknown. BA/LHR/FA open external checks.</div>
+  <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th>2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Arr</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
+  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O/Arr are Zulu. Call by = earlier of the existing HSB 19h latest-call calculation or HSB finish. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -464,6 +465,18 @@ var lastLiveRefreshAt = null;
 var HSB_TO_CHOCKS_LIMIT = 1140;
 var CANNOT_COVER_AFTER_HSB_START = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
+var REPORT_BEFORE_TAKEOFF = 90;
+var CALL_BEFORE_REPORT = 120;
+// Original scheduled A380 T5 report times. These stay fixed even if FICO or
+// FlightAware later shows a revised/delayed departure time.
+var ORIGINAL_REPORT_BY_FLIGHT = {
+  BA207: 7*60+25,
+  BA285: 8*60+15,
+  BA213: 12*60,
+  BA269: 12*60+35,
+  BA011: 16*60+55,
+  BA057: 18*60+50
+};
 var COST_PER_FLIGHT_USD = 0.005;
 var STORAGE_KEY = "hsb-reserve-fico-current";
 var HSB_START_KEY = "hsb-reserve-hsb-start";
@@ -497,6 +510,23 @@ function compactToMin(s){ s = digitsOnly(s).padStart(4, "0"); return Number(s.sl
 function minToBlock(mins){ mins = Math.abs(mins); return String(Math.floor(mins/60)).padStart(2,"0") + ":" + String(mins%60).padStart(2,"0"); }
 function fmt(mins){ var plus = mins >= 1440 ? " +1" : ""; mins = ((mins % 1440) + 1440) % 1440; return String(Math.floor(mins/60)).padStart(2,"0") + String(mins%60).padStart(2,"0") + "Z" + plus; }
 function fmtShort(mins){ return fmt(mins).replace("Z",""); }
+function scheduledReportMins(f){
+  if (f && Object.prototype.hasOwnProperty.call(ORIGINAL_REPORT_BY_FLIGHT, f.flight)) return ORIGINAL_REPORT_BY_FLIGHT[f.flight];
+  return f.schedTO - REPORT_BEFORE_TAKEOFF;
+}
+function londonLocalCompactFromUtcMinutes(mins){
+  var now = new Date();
+  var base = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  var d = new Date(base + mins * 60000);
+  try {
+    var parts = new Intl.DateTimeFormat("en-GB", { timeZone:"Europe/London", hour:"2-digit", minute:"2-digit", hourCycle:"h23" }).formatToParts(d);
+    var hh = parts.find(function(p){ return p.type === "hour"; });
+    var mm = parts.find(function(p){ return p.type === "minute"; });
+    if (hh && mm) return hh.value + mm.value + "l";
+  } catch (_) {}
+  return String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "l";
+}
+function twoHoursBeforeReportLocal(f){ return londonLocalCompactFromUtcMinutes(scheduledReportMins(f) - CALL_BEFORE_REPORT); }
 function dur(mins){ mins = Math.max(0, Math.abs(mins)); return Math.floor(mins/60) + "h " + String(mins%60).padStart(2,"0") + "m"; }
 function utcNowMinutes(){ var d = new Date(); return d.getUTCHours()*60 + d.getUTCMinutes(); }
 function utcNowText(){ var d = new Date(); return String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z"; }
@@ -805,24 +835,22 @@ function operationalStatus(f,state){
 function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || f.cannotCoverFromThisHsb || state.hsbFinished || f.delta < 0; }
 function dotClassFor(f,state){
   if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "dot-green";
-  if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "dot-red";
-  if (f.fs && f.fs.status === "no_live_refresh") return "dot-grey";
   if(state.hsbNotStarted)return"dot-blue";
   if(isSafe(f,state))return"dot-green";
-  if(operationalStatus(f,state)==="Unknown")return"dot-grey";
   if(f.delta<=30)return"dot-red";
+  if (f.fs && f.fs.status === "no_live_refresh") return "dot-grey";
+  if(operationalStatus(f,state)==="Unknown" || operationalStatus(f,state)==="Past ETD — refresh")return"dot-grey";
   return"dot-amber";
 }
 function rowClassFor(f,state){
   if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "row-departed";
-  if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "row-critical";
-  if (f.fs && f.fs.status === "no_live_refresh") return "";
   if(state.hsbNotStarted)return"row-pre";
   if(isSafe(f,state))return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe";
   if(f.delta<=30)return"row-critical";
+  if (f.fs && f.fs.status === "no_live_refresh") return "";
   return"row-live";
 }
-function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-action"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s===">19h from HSB")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
+function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-unknown"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s===">19h from HSB")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
 function countdownText(f,state){
   if(isSafe(f,state))return"Safe";
   if(f.delta < 0)return"Expired";
@@ -837,7 +865,7 @@ function liveDepartureDetails(f){
   var delayMins = Math.max(1, Math.round((estimated - scheduled) / 60000));
   var d = new Date(estimated);
   var newEtd = String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "Z";
-  return "Delayed " + delayMins + "m<span class='small'>New ETD " + newEtd + "</span>";
+  return "Delayed " + delayMins + "m · New ETD " + newEtd;
 }
 function statusHtml(f,state){
   var op = operationalStatus(f,state);
@@ -869,10 +897,12 @@ function render(){
       "<td><span class='dot " + dotClassFor(f,state) + "'></span></td>" +
       "<td><strong>" + f.flight + "</strong></td>" +
       "<td>" + f.route + "</td>" +
+      "<td><strong>" + twoHoursBeforeReportLocal(f) + "</strong></td>" +
+      "<td>" + fmtShort(scheduledReportMins(f)) + "</td>" +
       "<td>" + fmtShort(f.schedTO) + "</td>" +
       "<td>" + fmtShort(f.schedArr) + "</td>" +
       "<td>" + minToBlock(f.block) + "</td>" +
-      "<td><span class='badge " + callBadge + "'>" + fmt(f.callBy) + "</span><span class='small'>" + f.callByReason + "</span></td>" +
+      "<td><span class='badge " + callBadge + "' title='" + f.callByReason + "'>" + fmt(f.callBy) + "</span></td>" +
       "<td class='" + statusClass(f,state) + "'>" + statusHtml(f,state) + "</td>" +
       "<td>" + countdownText(f,state) + "</td>" +
       "<td>" + checksHtml(f.flight) + "</td>";
