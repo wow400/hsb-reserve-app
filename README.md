@@ -1,29 +1,25 @@
-# HSB Reserve App v25
+# HSB Reserve App v27
 
-Built from the working v24 source.
+Built from the working v26 source.
 
-Changes in v25:
-- Adds server-side current-session persistence using the existing Cloudflare `USAGE_KV` binding.
-- The latest same-day HSB session is shared between the Home Screen web app, Safari, and other browsers/devices opening the same Worker URL.
-- Persists FICO text, parsed flights, HSB start/finish, FlightAware statuses, delay/New ETD information, confirmed-airborne state via saved statuses, and last live-refresh time.
-- On startup, today's Cloudflare session is preferred over browser-local storage, so stale Safari/Home Screen local state does not override the latest saved server state.
-- If there is no server snapshot yet, the app falls back to the existing local storage and then seeds Cloudflare with that state.
-- Session data is keyed to the UTC date; yesterday's flight/live state is not restored on a new UTC day.
-- Session snapshots expire automatically after 3 days.
-- A final page-close save is attempted so closing the Home Screen app immediately after a change does not normally lose the latest state.
+Changes in v27:
+- Adds one-line table columns in this order: Flight / Route / 2hrs b4 Report / Report / T/O / Arr / Block / Call by / Status / Countdown / Checks.
+- Report uses the original scheduled A380 T5 report time for each flight and does not move when FICO/FlightAware shows a delay or revised ETD.
+- `2hrs b4 Report` is calculated from that fixed original report time and displayed in Heathrow local time with a lower-case `l`; BST/GMT is handled dynamically with the `Europe/London` timezone.
+- Tightens table spacing and mobile layout so more information is visible on iPhone/iPad while keeping each flight on one row.
+- Delay details are one-line: `Delayed Xm · New ETD xxxxZ`.
+- Red urgency is reserved for a call deadline within 30 minutes; amber means still callable with more than 30 minutes remaining; green means safe/no longer callable. Past-ETD refresh-needed status remains grey/unknown until live status is checked.
+- Legend/footer wording now matches the actual status logic.
 
-Changes retained from v24/v23/v22/v21:
-- Correct FICO parsing when the ETD field contains a revised departure such as `R1430`.
+Retained from v26/v25:
+- Cloudflare KV shared current-session persistence across Home Screen app, Safari and other devices.
+- UTC-day rollover protection for session data.
 - A380-only FICO reminder: `DP LHR a8`.
-- HSB start/finish in 15-minute increments.
-- FICO blank-line compaction.
-- Re-parsing unchanged flights preserves their live state.
-- `>19h from HSB` status wording.
-- Reliable live delays show `Delayed Xm` and `New ETD xxxxZ`.
-- Past scheduled ETD is not treated as a delay without live evidence.
-- Once FlightAware confirms a flight has taken off, later refreshes skip it and spend no further AeroAPI credits on it for that UTC day/schedule.
-- FICO X rows are cancelled without AeroAPI lookup.
-- $8 monthly AeroAPI guard and 10-minute cache.
-- BA/LHR/FA external checks.
+- 15-minute HSB start/finish choices.
+- FICO blank-line compaction and corrected revised-ETD parsing.
+- Re-parsing unchanged flights preserves live status.
+- `>19h from HSB` handling.
+- FlightAware delay/New ETD display, no false delay inference, and confirmed-airborne flights are excluded from later paid refreshes.
+- $8 monthly AeroAPI guard, 10-minute cache and BA/LHR/FA external links.
 
 Crew-duty/FDP calculations are intentionally not included.
