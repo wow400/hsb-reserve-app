@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v37",
+    version: "v38",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v37",
+    version: "v38",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v37", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v38", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v37",
+      version: "v38",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v37", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v38", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v37",
+    version: "v38",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -443,7 +443,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v37</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v38</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -452,7 +452,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
-  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Call by = latest useful contact time after the relevant 3/4-crew FDP limit, your Scheme/OM A HSB limit, BLR 19h limit, two-hour travel time and HSB finish are all applied. Tap Call by to open the FDP detail for that flight; the rule that actually limits Call by is highlighted. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
+  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Call by = latest useful contact time after the original/augmented crew BLR limit, your Scheme/OM A HSB limit, BLR 19h limit, two-hour travel time and HSB finish are all applied. For these six A380 trips the app uses BLR Box A for 2 crew, Box C (+3h) for 3 crew and Box D to Scheme for 4 crew; BLR FDP includes the 30-minute clear after arrival. Tap Call by to open the FDP detail for that flight; the rule that actually limits Call by is highlighted. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -469,6 +469,7 @@ var CANNOT_COVER_AFTER_HSB_START = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
 var REPORT_BEFORE_TAKEOFF = 90;
 var CALL_BEFORE_REPORT = 120;
+var BLR_CLEAR_AFTER_ARRIVAL = 30;
 // Original scheduled A380 T5 report times. These stay fixed even if FICO or
 // FlightAware later shows a revised/delayed departure time.
 var ORIGINAL_REPORT_BY_FLIGHT = {
@@ -481,6 +482,7 @@ var ORIGINAL_REPORT_BY_FLIGHT = {
 };
 // Normal A380 operating flight-crew complements for this app. A380 rest is Class 1.
 var A380_CREW_BY_FLIGHT = { BA207:3, BA285:3, BA213:2, BA269:3, BA011:4, BA057:3 };
+var BLR_CONTINENTAL_US_DESTINATIONS = { MIA:true, SFO:true, BOS:true, LAX:true };
 function baseFdpTwoPilot(report){
   var m=((report%1440)+1440)%1440;
   if(m>=6*60 && m<=13*60+29)return 13*60;
@@ -497,6 +499,19 @@ function baseFdpTwoPilot(report){
   if(m>=5*60+30 && m<=5*60+44)return 12*60+30;
   return 12*60+45;
 }
+function blrBoxAFdp(f,report){
+  var local=londonLocalMinutesFromUtcMinutes(report);
+  var continentalUs=!!BLR_CONTINENTAL_US_DESTINATIONS[f.to];
+  if(local>=6*60 && local<=17*60+59)return 12*60;
+  if(local>=18*60 && local<=21*60+59)return continentalUs ? 11*60+30 : 11*60;
+  return continentalUs ? 10*60+30 : 10*60;
+}
+function blrFdpForCrew(boxA,crew,schemeFdp){
+  if(crew===2)return Math.min(boxA,schemeFdp);
+  if(crew===3)return Math.min(boxA+3*60,schemeFdp); // Box C maximum.
+  return schemeFdp; // Box D: above Box A +3h, capped by BA Scheme.
+}
+function blrBoxName(crew){ return crew===2 ? "Box A" : (crew===3 ? "Box C" : "Box D"); }
 function crewInfo(f){
   var crew=A380_CREW_BY_FLIGHT[f.flight] || null;
   if(!crew)return null;
@@ -509,7 +524,19 @@ function crewInfo(f){
   var augmentedCrew=Math.min(4,crew+1), augmentedFdp=maxFdp, augmentedLatest=latest;
   if(crew===2){ augmentedFdp=(f.block>9*60 ? 17*60 : 16*60); augmentedLatest=report+augmentedFdp-f.block; }
   else if(crew===3){ augmentedFdp=(f.block>9*60 ? 18*60 : 17*60); augmentedLatest=report+augmentedFdp-f.block; }
-  return {crew:crew,report:report,maxFdp:maxFdp,expiry:expiry,latest:latest,augmentedCrew:augmentedCrew,augmentedFdp:augmentedFdp,augmentedLatest:augmentedLatest};
+
+  // Industrial BLR limits. For these six A380 trips the agreed app mapping is:
+  // 2 pilots = Box A; 3 pilots = Box C (Box A +3h); 4 pilots = Box D to Scheme.
+  // BLR FDP runs to 30 minutes after arrival, hence the extra 30-minute clear.
+  var boxA=blrBoxAFdp(f,report);
+  var blrOriginalFdp=blrFdpForCrew(boxA,crew,maxFdp);
+  var blrOriginalLatest=report+blrOriginalFdp-f.block-BLR_CLEAR_AFTER_ARRIVAL;
+  var blrAugmentedFdp=blrFdpForCrew(boxA,augmentedCrew,augmentedFdp);
+  var blrAugmentedLatest=report+blrAugmentedFdp-f.block-BLR_CLEAR_AFTER_ARRIVAL;
+  var originalOperationalLatest=Math.min(latest,blrOriginalLatest);
+  var originalLimiter=(blrOriginalLatest<=latest ? "BLR "+crew+" crew" : "Scheme / OM A");
+
+  return {crew:crew,report:report,maxFdp:maxFdp,expiry:expiry,latest:latest,augmentedCrew:augmentedCrew,augmentedFdp:augmentedFdp,augmentedLatest:augmentedLatest,boxA:boxA,blrOriginalFdp:blrOriginalFdp,blrOriginalLatest:blrOriginalLatest,blrOriginalBox:blrBoxName(crew),blrAugmentedFdp:blrAugmentedFdp,blrAugmentedLatest:blrAugmentedLatest,blrAugmentedBox:blrBoxName(augmentedCrew),originalOperationalLatest:originalOperationalLatest,originalLimiter:originalLimiter};
 }
 function estimatedDepartureMins(f){
   if(!f.fs || !f.fs.found)return null;
@@ -562,23 +589,25 @@ function hsbAugmentationInfo(f,ci,hsbStart,hsbEnd){
   var schemeLatest=schemeLatestDepartureForHsb(f,ci,hsbStart,hsbEnd);
   if(schemeLatest===null)schemeLatest=-999999;
   if(ci.crew===4){
-    // A fifth pilot does not increase the crew-complement FDP limit, but if
-    // the HSB pilot is replacing sickness their own Scheme and BLR limits
-    // still determine how late they personally could operate the flight.
-    var replacementLatest=Math.min(ci.latest,schemeLatest,blrLatest);
-    var replacementLimiter="4 crew FDP";
-    var replacementMin=Math.min(ci.latest,schemeLatest,blrLatest);
+    // A fifth pilot does not increase the operating crew category. If the
+    // HSB pilot is replacing sickness, the existing 4-crew BLR/Scheme limit,
+    // their own HSB Scheme limit and the HSB 19h envelope all still apply.
+    var replacementLatest=Math.min(ci.originalOperationalLatest,schemeLatest,blrLatest);
+    var replacementLimiter=ci.originalLimiter;
+    var replacementMin=replacementLatest;
     if(replacementMin===blrLatest)replacementLimiter="BLR 19h";
     else if(replacementMin===schemeLatest)replacementLimiter="Scheme / OM A";
-    return {crewLatest:ci.latest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:replacementLatest,extension:0,limiter:replacementLimiter};
+    return {crewLatest:ci.originalOperationalLatest,schemeLatest:schemeLatest,blrLatest:blrLatest,blrCrewLatest:ci.blrOriginalLatest,usableLatest:replacementLatest,extension:0,limiter:replacementLimiter};
   }
-  var usableLatest=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
-  var extension=Math.max(0,usableLatest-ci.latest);
-  var limiter=ci.augmentedCrew+" crew FDP";
-  var minVal=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
+  var augmentedCrewLimit=Math.min(ci.augmentedLatest,ci.blrAugmentedLatest);
+  var augmentedCrewLimiter=(ci.blrAugmentedLatest<=ci.augmentedLatest ? ci.augmentedCrew+" crew BLR" : ci.augmentedCrew+" crew Scheme");
+  var usableLatest=Math.min(augmentedCrewLimit,schemeLatest,blrLatest);
+  var extension=Math.max(0,usableLatest-ci.originalOperationalLatest);
+  var limiter=augmentedCrewLimiter;
+  var minVal=usableLatest;
   if(minVal===blrLatest)limiter="BLR 19h";
   else if(minVal===schemeLatest)limiter="Scheme / OM A";
-  return {crewLatest:ci.augmentedLatest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:usableLatest,extension:extension,limiter:limiter};
+  return {crewLatest:augmentedCrewLimit,schemeLatest:schemeLatest,blrLatest:blrLatest,blrCrewLatest:ci.blrAugmentedLatest,usableLatest:usableLatest,extension:extension,limiter:limiter};
 }
 function callabilityFromHsb(f,hsbStart,hsbEnd){
   var ci=crewInfo(f);
@@ -593,19 +622,27 @@ function callabilityFromHsb(f,hsbStart,hsbEnd){
 }
 function crewDetailData(f,ci){
   var ai=f.augmentationInfo;
-  var lines=[f.flight+" "+f.route+" — original crew "+ci.crew+" pilots","Original report: "+fmt(ci.report),"Max FDP: "+minToBlock(ci.maxFdp),"FDP expires: "+fmt(ci.expiry),"Block: "+minToBlock(f.block),"Original crew latest departure: "+fmt(ci.latest)];
+  var lines=[f.flight+" "+f.route+" — original crew "+ci.crew+" pilots",
+    "Original report: "+fmt(ci.report),
+    "Scheme max FDP: "+minToBlock(ci.maxFdp),
+    "Scheme latest departure: "+fmt(ci.latest),
+    "BLR "+ci.crew+" crew ("+ci.blrOriginalBox+") max FDP: "+minToBlock(ci.blrOriginalFdp),
+    "BLR latest departure: "+fmt(ci.blrOriginalLatest),
+    "Original operating limit: "+fmt(ci.originalOperationalLatest)+" ("+ci.originalLimiter+")",
+    "Block: "+minToBlock(f.block)];
   if(ci.crew===4){
-    lines.push("Already 4 pilots — an additional HSB pilot does not extend the 4 crew FDP limit.");
+    lines.push("Already 4 pilots — an additional HSB pilot does not extend the 4 crew limit.");
     if(ai){
       lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
-      lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
+      lines.push("Your HSB BLR 19h latest departure: "+fmt(ai.blrLatest));
     }
     lines.push("Usable FDP extension: 0m");
   }else if(ai){
     lines.push("With HSB pilot: "+ci.augmentedCrew+" pilots");
-    lines.push(ci.augmentedCrew+" crew limit: "+fmt(ai.crewLatest));
+    lines.push(ci.augmentedCrew+" crew BLR ("+ci.blrAugmentedBox+") max FDP: "+minToBlock(ci.blrAugmentedFdp));
+    lines.push(ci.augmentedCrew+" crew BLR latest departure: "+fmt(ci.blrAugmentedLatest));
     lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
-    lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
+    lines.push("Your HSB BLR 19h latest departure: "+fmt(ai.blrLatest));
     if(ai.extension>0) lines.push("Usable FDP extension: +"+dur(ai.extension)+" → "+fmt(ai.usableLatest));
     else lines.push("Usable FDP extension: 0m — calling you adds no later departure capability.");
   }
@@ -659,7 +696,7 @@ function scheduledReportMins(f){
   if (f && Object.prototype.hasOwnProperty.call(ORIGINAL_REPORT_BY_FLIGHT, f.flight)) return ORIGINAL_REPORT_BY_FLIGHT[f.flight];
   return f.schedTO - REPORT_BEFORE_TAKEOFF;
 }
-function londonLocalCompactFromUtcMinutes(mins){
+function londonLocalMinutesFromUtcMinutes(mins){
   var now = new Date();
   var base = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   var d = new Date(base + mins * 60000);
@@ -667,9 +704,13 @@ function londonLocalCompactFromUtcMinutes(mins){
     var parts = new Intl.DateTimeFormat("en-GB", { timeZone:"Europe/London", hour:"2-digit", minute:"2-digit", hourCycle:"h23" }).formatToParts(d);
     var hh = parts.find(function(p){ return p.type === "hour"; });
     var mm = parts.find(function(p){ return p.type === "minute"; });
-    if (hh && mm) return hh.value + mm.value + "l";
+    if (hh && mm) return Number(hh.value)*60 + Number(mm.value);
   } catch (_) {}
-  return String(d.getUTCHours()).padStart(2,"0") + String(d.getUTCMinutes()).padStart(2,"0") + "l";
+  return d.getUTCHours()*60 + d.getUTCMinutes();
+}
+function londonLocalCompactFromUtcMinutes(mins){
+  var m=londonLocalMinutesFromUtcMinutes(mins);
+  return String(Math.floor(m/60)).padStart(2,"0") + String(m%60).padStart(2,"0") + "l";
 }
 function twoHoursBeforeReportLocal(f){ return londonLocalCompactFromUtcMinutes(scheduledReportMins(f) - CALL_BEFORE_REPORT); }
 function dur(mins){ mins = Math.max(0, Math.abs(mins)); return Math.floor(mins/60) + "h " + String(mins%60).padStart(2,"0") + "m"; }
@@ -1030,10 +1071,12 @@ function liveDepartureDetails(f){
 function statusHtml(f,state){
   var op = operationalStatus(f,state);
   var ci=f.crewInfo;
-  var crossed=ci && estimatedDepartureMins(f)!==null && estimatedDepartureMins(f)>=ci.latest;
-  if (op !== "Delayed") return crossed ? op + " · Crew FDP" : op;
+  var etd=estimatedDepartureMins(f);
+  var crossed=ci && etd!==null && etd>=ci.originalOperationalLatest;
+  var crossedLabel=ci && ci.originalLimiter.indexOf("BLR")===0 ? "BLR crew limit" : "Crew FDP";
+  if (op !== "Delayed") return crossed ? op + " · " + crossedLabel : op;
   var details = liveDepartureDetails(f) || op;
-  return crossed ? details + " · Crew FDP" : details;
+  return crossed ? details + " · " + crossedLabel : details;
 }
 
 function todayIso(){ return new Date().toISOString().slice(0,10); }
