@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v35",
+    version: "v37",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v35",
+    version: "v37",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v35", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v37", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v35",
+      version: "v37",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v35", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v37", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v35",
+    version: "v37",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -424,16 +424,16 @@ h1{margin:0;font-size:1.65rem}.version{font-size:.78rem;background:#102742;color
 .card{background:rgba(11,17,24,.94);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.28);overflow:hidden;margin-bottom:12px}.guard{padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.ok{color:var(--green)!important}.bad{color:var(--red)!important}
 .fico{padding:14px 16px}.fico-grid{display:grid;grid-template-columns:1fr 230px;gap:14px}.fico label{display:block;color:var(--ink);font-weight:900;font-size:.82rem;margin-bottom:6px}textarea{width:100%;min-height:130px;background:#f9fbff;color:#111;border:1px solid #cfd7e2;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.25}.button-col{display:flex;flex-direction:column;gap:10px}
 button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}button.danger{border-color:#765025;color:#ffc400}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
-.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}table{width:100%;min-width:1120px;border-collapse:collapse;font-size:.88rem}th,td{border-bottom:1px solid var(--line);padding:7px 5px;text-align:left;white-space:nowrap;vertical-align:middle}.center{text-align:center}.route{font-weight:900}.crew-limit-btn{border:0;background:transparent;padding:0;color:var(--ink);font:inherit;font-weight:900;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}.crew-limit-btn.warn{color:var(--amber)}.crew-limit-btn.over{color:var(--red)}th{background:#111922;color:#c9d1d9;font-size:.73rem;font-weight:900}td{color:#eef3f8}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}table{width:100%;min-width:1040px;border-collapse:collapse;font-size:.88rem}th,td{border-bottom:1px solid var(--line);padding:7px 5px;text-align:left;white-space:nowrap;vertical-align:middle}.center{text-align:center}.route{font-weight:900}.call-by-btn{border:0;cursor:pointer;font:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}th{background:#111922;color:#c9d1d9;font-size:.73rem;font-weight:900}td{color:#eef3f8}
 .badge{font-weight:900;border-radius:8px;display:inline-block;padding:3px 7px}.badge-green{background:rgba(65,212,90,.14);color:var(--green)}.badge-amber{background:rgba(255,196,0,.14);color:var(--amber)}.small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
 .status-planned{color:var(--amber);font-weight:900}.status-delayed{color:var(--amber);font-weight:900}.status-action{color:var(--red);font-weight:900}.status-safe{color:var(--green);font-weight:900}.status-unknown{color:var(--grey);font-weight:900}.row-safe{background:rgba(65,212,90,.06)}.row-pre{background:rgba(88,166,255,.07)}.row-live{background:rgba(255,196,0,.06)}.row-critical{background:rgba(255,75,75,.12)}.row-departed{background:rgba(255,255,255,.035)}
 .dot{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:-4px;box-shadow:inset 0 2px 3px rgba(255,255,255,.85),inset 0 -3px 5px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.5)}.dot-green{background:linear-gradient(#83ff83,#0cad2a)}.dot-amber{background:linear-gradient(#ffd56a,#ff9800)}.dot-red{background:linear-gradient(#ff7777,#d60000)}.dot-blue{background:linear-gradient(#7db7ff,#1b64d8)}.dot-grey{background:linear-gradient(#eee,#9aa3ad)}
 .checks{display:flex;gap:6px}.check-link{display:inline-block;text-decoration:none;background:#05080c;border:1px solid #244b78;padding:5px 7px;border-radius:7px;font-size:.78rem;font-weight:900;line-height:1}.check-link.ba{color:#fff;border-color:#555}.check-link.lhr{color:#d8b4ff;border-color:#5b3f85}.check-link.fa{color:#74b9ff;border-color:#244b78}
 .legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;color:#c9d1d9;font-size:.82rem}.legend span{display:inline-flex;gap:6px;align-items:center}.note{padding:10px 12px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--line);line-height:1.35}
 .errorbox{display:none;padding:10px 14px;border:1px solid rgba(255,75,75,.5);background:rgba(255,75,75,.08);border-radius:12px;margin-bottom:12px;color:#ffb8b8}
-.crew-detail-row td{padding:0 8px 8px;border-bottom:1px solid var(--line);white-space:normal}.crew-detail{margin:7px 0 0;padding:11px 13px;background:#f7f8fb;color:#111;border-radius:12px;border:1px solid #cfd7e2;line-height:1.35;white-space:pre-line;position:relative}.crew-detail-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#1677c8;padding:4px 7px;font-size:.84rem}.crew-detail-text{padding-right:48px}
-@media(max-width:800px){body{padding:7px}.app{padding-top:4px}.header{grid-template-columns:1fr;gap:8px;margin-bottom:8px}h1{font-size:1.42rem}.sub{font-size:.82rem;line-height:1.3}.controls{grid-template-columns:1fr 1fr 1fr;gap:5px}.control{padding:7px 5px}.control label{font-size:.62rem}.control input,select{font-size:1rem}.clock{font-size:1.08rem}.fico{padding:10px}.fico-grid{grid-template-columns:1fr;gap:9px}textarea{min-height:92px;font-size:.74rem;padding:8px}.button-col{gap:8px}button{padding:10px;font-size:.86rem}.parse-note{font-size:.74rem;margin-top:2px}.guard{grid-template-columns:1fr}.table-scroll{margin:0}table{font-size:.76rem;min-width:1080px}th,td{padding:6px 4px}th{font-size:.66rem}.dot{width:15px;height:15px}.checks{gap:4px}.check-link{padding:4px 5px;font-size:.7rem}.badge{padding:2px 5px}.legend{gap:10px;padding:9px 10px;font-size:.74rem}.note{font-size:.72rem;padding:9px 10px}}
-@media(max-width:480px){body{padding:5px}.controls{gap:4px}.control{padding:6px 3px}.fico{padding:8px}textarea{min-height:82px}.table-scroll{border-top:1px solid var(--line)}table{font-size:.72rem;min-width:1040px}th,td{padding:5px 3px}.legend{gap:8px}.legend .dot{width:14px;height:14px}}
+.crew-detail-row td{padding:0 8px 8px;border-bottom:1px solid var(--line);white-space:normal}.crew-detail{margin:7px 0 0;padding:11px 13px;background:#f7f8fb;color:#111;border-radius:12px;border:1px solid #cfd7e2;line-height:1.35;white-space:pre-line;position:relative}.crew-detail-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#1677c8;padding:4px 7px;font-size:.84rem}.crew-detail-text{padding-right:48px}.limiting-rule{margin:8px 48px 8px 0;padding:8px 10px;border:1px solid #d6aa00;border-radius:8px;background:#fff1ad;color:#111;font-weight:900}
+@media(max-width:800px){body{padding:7px}.app{padding-top:4px}.header{grid-template-columns:1fr;gap:8px;margin-bottom:8px}h1{font-size:1.42rem}.sub{font-size:.82rem;line-height:1.3}.controls{grid-template-columns:1fr 1fr 1fr;gap:5px}.control{padding:7px 5px}.control label{font-size:.62rem}.control input,select{font-size:1rem}.clock{font-size:1.08rem}.fico{padding:10px}.fico-grid{grid-template-columns:1fr;gap:9px}textarea{min-height:92px;font-size:.74rem;padding:8px}.button-col{gap:8px}button{padding:10px;font-size:.86rem}.parse-note{font-size:.74rem;margin-top:2px}.guard{grid-template-columns:1fr}.table-scroll{margin:0}table{font-size:.76rem;min-width:1000px}th,td{padding:6px 4px}th{font-size:.66rem}.dot{width:15px;height:15px}.checks{gap:4px}.check-link{padding:4px 5px;font-size:.7rem}.badge{padding:2px 5px}.legend{gap:10px;padding:9px 10px;font-size:.74rem}.note{font-size:.72rem;padding:9px 10px}}
+@media(max-width:480px){body{padding:5px}.controls{gap:4px}.control{padding:6px 3px}.fico{padding:8px}textarea{min-height:82px}.table-scroll{border-top:1px solid var(--line)}table{font-size:.72rem;min-width:960px}th,td{padding:5px 3px}.legend{gap:8px}.legend .dot{width:14px;height:14px}}
 
 .live-badge{display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;background:rgba(65,212,90,.14);border:1px solid rgba(65,212,90,.55);color:#41d45a;font-size:.72rem;font-weight:900;vertical-align:2px}
 .calls-green{color:#41d45a;font-weight:900}.calls-amber{color:#ffc400;font-weight:900}.calls-red{color:#ff4b4b;font-weight:900}.cache-note{color:#a8b0bb}
@@ -443,16 +443,16 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v35</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v37</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
 <section class="card guard" style="display:none"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
 <section class="card fico"><div class="fico-grid"><div><label for="ficoInput">Paste BA/FICO flight list</label><textarea id="ficoInput" spellcheck="false">${esc(DEFAULT_FICO)}</textarea></div><div class="button-col"><button class="primary" id="parseBtn">Parse FICO list</button><button class="danger" id="statusBtn">Refresh live status</button><div id="parseNote" class="parse-note">No automatic paid polling.</div></div></div></section>
 <section class="card">
-  <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Crew limit</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
-  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Crew limit = latest departure with the original crew complement, using scheduled block as the working proxy for flight time. Tap the time for the FDP calculation, including the usable extension after your Scheme/OM A HSB limit and BLR 19h limit are applied. Call by = latest useful contact time after the crew-complement FDP, your Scheme/OM A HSB limit, BLR 19h limit, two-hour travel time and HSB finish are all applied. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
+  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Call by = latest useful contact time after the relevant 3/4-crew FDP limit, your Scheme/OM A HSB limit, BLR 19h limit, two-hour travel time and HSB finish are all applied. Tap Call by to open the FDP detail for that flight; the rule that actually limits Call by is highlighted. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -520,12 +520,6 @@ function estimatedDepartureMins(f){
   while(m < f.schedTO-720)m+=1440;
   return m;
 }
-function crewLimitState(f,ci){
-  var etd=estimatedDepartureMins(f); if(etd===null)return "";
-  if(etd>=ci.latest)return "over";
-  if(ci.latest-etd<=30)return "warn";
-  return "";
-}
 function initialNightWindowEnd(hsbStart){
   var m=((hsbStart%1440)+1440)%1440;
   var dayBase=hsbStart-m;
@@ -572,7 +566,7 @@ function hsbAugmentationInfo(f,ci,hsbStart,hsbEnd){
     // the HSB pilot is replacing sickness their own Scheme and BLR limits
     // still determine how late they personally could operate the flight.
     var replacementLatest=Math.min(ci.latest,schemeLatest,blrLatest);
-    var replacementLimiter="Original 4-pilot FDP";
+    var replacementLimiter="4 crew FDP";
     var replacementMin=Math.min(ci.latest,schemeLatest,blrLatest);
     if(replacementMin===blrLatest)replacementLimiter="BLR 19h";
     else if(replacementMin===schemeLatest)replacementLimiter="Scheme / OM A";
@@ -580,7 +574,7 @@ function hsbAugmentationInfo(f,ci,hsbStart,hsbEnd){
   }
   var usableLatest=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
   var extension=Math.max(0,usableLatest-ci.latest);
-  var limiter="Crew-complement FDP";
+  var limiter=ci.augmentedCrew+" crew FDP";
   var minVal=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
   if(minVal===blrLatest)limiter="BLR 19h";
   else if(minVal===schemeLatest)limiter="Scheme / OM A";
@@ -593,40 +587,40 @@ function callabilityFromHsb(f,hsbStart,hsbEnd){
   var usableDeparture=ai ? ai.usableLatest : blrLatest;
   var latestUsefulCall=usableDeparture-CALL_BEFORE_TAKEOFF;
   var callBy=Math.min(latestUsefulCall,hsbEnd);
-  return {crewInfo:ci,augmentationInfo:ai,usableDeparture:usableDeparture,latestUsefulCall:latestUsefulCall,callBy:callBy,tooLate:callBy<hsbStart};
+  var departureLimiter=ai ? ai.limiter : "BLR 19h";
+  var callLimiter=(hsbEnd<=latestUsefulCall ? "HSB finish" : departureLimiter);
+  return {crewInfo:ci,augmentationInfo:ai,usableDeparture:usableDeparture,latestUsefulCall:latestUsefulCall,callBy:callBy,tooLate:callBy<hsbStart,callLimiter:callLimiter};
 }
-function crewLimitTitle(f,ci){
+function crewDetailData(f,ci){
   var ai=f.augmentationInfo;
   var lines=[f.flight+" "+f.route+" — original crew "+ci.crew+" pilots","Original report: "+fmt(ci.report),"Max FDP: "+minToBlock(ci.maxFdp),"FDP expires: "+fmt(ci.expiry),"Block: "+minToBlock(f.block),"Original crew latest departure: "+fmt(ci.latest)];
   if(ci.crew===4){
-    lines.push("Already 4 pilots — an additional HSB pilot does not extend the crew-complement FDP limit.");
+    lines.push("Already 4 pilots — an additional HSB pilot does not extend the 4 crew FDP limit.");
     if(ai){
       lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
       lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
     }
     lines.push("Usable FDP extension: 0m");
-    if(f.tooLateFromThisHsb){
-      lines.push("Earliest HSB arrival: "+fmt(f.hsbStartForDetail+CALL_BEFORE_TAKEOFF)+" — later than your usable departure limit, so this flight cannot use you from this HSB.");
-    }else{
-      lines.push("Latest useful call: "+fmt(f.callBy)+" (includes 2h travel and HSB finish).");
-    }
   }else if(ai){
     lines.push("With HSB pilot: "+ci.augmentedCrew+" pilots");
-    lines.push("Crew-complement limit: "+fmt(ai.crewLatest));
+    lines.push(ci.augmentedCrew+" crew limit: "+fmt(ai.crewLatest));
     lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
     lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
-    if(ai.extension>0){
-      lines.push("Usable FDP extension: +"+dur(ai.extension)+" → "+fmt(ai.usableLatest)+" (limited by "+ai.limiter+")");
-    }else{
-      lines.push("Usable FDP extension: 0m — calling you adds no later departure capability.");
-    }
-    if(f.tooLateFromThisHsb){
-      lines.push("Earliest HSB arrival: "+fmt(f.hsbStartForDetail+CALL_BEFORE_TAKEOFF)+" — later than the usable departure limit, so this flight cannot use you from this HSB.");
-    }else{
-      lines.push("Latest useful call: "+fmt(f.callBy)+" (includes 2h travel and HSB finish).");
-    }
+    if(ai.extension>0) lines.push("Usable FDP extension: +"+dur(ai.extension)+" → "+fmt(ai.usableLatest));
+    else lines.push("Usable FDP extension: 0m — calling you adds no later departure capability.");
   }
-  return lines.join("\\n");
+  if(f.tooLateFromThisHsb){
+    lines.push("Earliest HSB arrival: "+fmt(f.hsbStartForDetail+CALL_BEFORE_TAKEOFF)+" — later than the usable departure limit, so this flight cannot use you from this HSB.");
+  }else{
+    lines.push("Latest useful call: "+fmt(f.callBy)+" (includes 2h travel and HSB finish).");
+  }
+  var limiting;
+  if(f.tooLateFromThisHsb){
+    limiting="LIMITING: "+f.callLimiter+" → latest useful call "+fmt(f.callBy)+" is before HSB starts "+fmt(f.hsbStartForDetail);
+  }else{
+    limiting="LIMITING: "+f.callLimiter+" → Call by "+fmt(f.callBy);
+  }
+  return {text:lines.join("\\n"),limiting:limiting};
 }
 var COST_PER_FLIGHT_USD = 0.005;
 var STORAGE_KEY = "hsb-reserve-fico-current";
@@ -969,11 +963,11 @@ function computeRows(){
     var capability=callabilityFromHsb(f,hsbStart,hsbEnd);
     var latestCall = capability.latestUsefulCall;
     var callBy = capability.callBy;
-    var callByReason = capability.tooLate ? "Latest useful call is before HSB starts" : (hsbEnd<=latestCall ? "HSB finish" : "Latest useful FDP/BLR call");
+    var callByReason = capability.tooLate ? (capability.callLimiter+" makes latest useful call before HSB starts") : ("Limited by "+capability.callLimiter);
     var delta = capability.tooLate ? -1 : futureDelta(callBy, now);
     var fs = f.ficoCancelled ? { status:"cancelled", found:true, label:"Cancelled", safe_by_status:true, source:"fico" } : (statuses[f.flight] || { status:"no_live_refresh", found:false, label:null, safe_by_status:false });
     var cannotCover = cannotCoverFromHsb(f, hsbStart);
-    var row = Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs, cannotCoverFromThisHsb:cannotCover, tooLateFromThisHsb:capability.tooLate, hsbStartForDetail:hsbStart });
+    var row = Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs, cannotCoverFromThisHsb:cannotCover, tooLateFromThisHsb:capability.tooLate, hsbStartForDetail:hsbStart, callLimiter:capability.callLimiter });
     row.crewInfo = capability.crewInfo;
     row.augmentationInfo = capability.augmentationInfo;
     return row;
@@ -1069,8 +1063,7 @@ function render(){
       "<td>" + fmtShort(scheduledReportMins(f)) + "</td>" +
       "<td>" + fmtShort(f.schedTO) + "</td>" +
       "<td>" + minToBlock(f.block) + "</td>" +
-      "<td>" + (f.crewInfo ? "<button class='crew-limit-btn " + crewLimitState(f,f.crewInfo) + "' data-crew-index='" + i + "'>" + fmt(f.crewInfo.latest) + "</button>" : "—") + "</td>" +
-      "<td><span class='badge " + callBadge + "' title='" + f.callByReason + "'>" + (f.tooLateFromThisHsb ? "Too late" : fmt(f.callBy)) + "</span></td>" +
+      "<td><button class='call-by-btn badge " + callBadge + "' data-detail-index='" + i + "' title='" + f.callByReason + "'>" + (f.tooLateFromThisHsb ? "Too late" : fmt(f.callBy)) + "</button></td>" +
       "<td class='" + statusClass(f,state) + "'>" + statusHtml(f,state) + "</td>" +
       "<td>" + countdownText(f,state) + "</td>" +
       "<td>" + checksHtml(f.flight) + "</td>";
@@ -1082,21 +1075,25 @@ function render(){
     detailRow.className="crew-detail-row";
     detailRow.setAttribute("data-crew-index",String(idx));
     var detailCell=document.createElement("td");
-    detailCell.colSpan=12;
+    detailCell.colSpan=11;
     var detail=document.createElement("div");
     detail.className="crew-detail";
     var close=document.createElement("button");
     close.type="button"; close.className="crew-detail-close"; close.textContent="Close";
+    var data=crewDetailData(row,row.crewInfo);
+    var limiting=document.createElement("div");
+    limiting.className="limiting-rule";
+    limiting.textContent=data.limiting;
     var detailText=document.createElement("div");
     detailText.className="crew-detail-text";
-    detailText.textContent=crewLimitTitle(row,row.crewInfo);
+    detailText.textContent=data.text;
     close.addEventListener("click",function(){ selectedCrewFlight=null; render(); });
-    detail.appendChild(close); detail.appendChild(detailText); detailCell.appendChild(detail); detailRow.appendChild(detailCell);
+    detail.appendChild(close); detail.appendChild(limiting); detail.appendChild(detailText); detailCell.appendChild(detail); detailRow.appendChild(detailCell);
     flightRow.insertAdjacentElement("afterend",detailRow);
   }
-  rowsEl.querySelectorAll(".crew-limit-btn").forEach(function(btn){
+  rowsEl.querySelectorAll(".call-by-btn").forEach(function(btn){
     btn.addEventListener("click",function(){
-      var idx=Number(btn.getAttribute("data-crew-index")); var row=state.rows[idx];
+      var idx=Number(btn.getAttribute("data-detail-index")); var row=state.rows[idx];
       if(!row || !row.crewInfo) return;
       selectedCrewFlight=(selectedCrewFlight===row.flight ? null : row.flight);
       render();
@@ -1105,7 +1102,7 @@ function render(){
   if(selectedCrewFlight){
     var selectedIdx=state.rows.findIndex(function(r){ return r.flight===selectedCrewFlight; });
     if(selectedIdx>=0 && state.rows[selectedIdx].crewInfo){
-      var selectedBtn=rowsEl.querySelector(".crew-limit-btn[data-crew-index='"+selectedIdx+"']");
+      var selectedBtn=rowsEl.querySelector(".call-by-btn[data-detail-index='"+selectedIdx+"']");
       if(selectedBtn) insertCrewDetail(selectedBtn,state.rows[selectedIdx],selectedIdx);
     } else selectedCrewFlight=null;
   }
