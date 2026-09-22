@@ -463,6 +463,7 @@ var flights = [];
 var statuses = {};
 var usageGuard = null;
 var lastLiveRefreshAt = null;
+var selectedCrewFlight = null;
 var HSB_TO_CHOCKS_LIMIT = 1140;
 var CANNOT_COVER_AFTER_HSB_START = 1140;
 var CALL_BEFORE_TAKEOFF = 120;
@@ -973,34 +974,39 @@ function render(){
       "<td>" + checksHtml(f.flight) + "</td>";
     rowsEl.appendChild(tr);
   }
+  function insertCrewDetail(btn,row,idx){
+    var flightRow=btn.closest("tr");
+    var detailRow=document.createElement("tr");
+    detailRow.className="crew-detail-row";
+    detailRow.setAttribute("data-crew-index",String(idx));
+    var detailCell=document.createElement("td");
+    detailCell.colSpan=12;
+    var detail=document.createElement("div");
+    detail.className="crew-detail";
+    var close=document.createElement("button");
+    close.type="button"; close.className="crew-detail-close"; close.textContent="Close";
+    var detailText=document.createElement("div");
+    detailText.className="crew-detail-text";
+    detailText.textContent=crewLimitTitle(row,row.crewInfo);
+    close.addEventListener("click",function(){ selectedCrewFlight=null; render(); });
+    detail.appendChild(close); detail.appendChild(detailText); detailCell.appendChild(detail); detailRow.appendChild(detailCell);
+    flightRow.insertAdjacentElement("afterend",detailRow);
+  }
   rowsEl.querySelectorAll(".crew-limit-btn").forEach(function(btn){
     btn.addEventListener("click",function(){
       var idx=Number(btn.getAttribute("data-crew-index")); var row=state.rows[idx];
       if(!row || !row.crewInfo) return;
-      var existing=rowsEl.querySelector(".crew-detail-row");
-      if(existing){
-        var same=existing.getAttribute("data-crew-index")===String(idx);
-        existing.remove();
-        if(same) return;
-      }
-      var flightRow=btn.closest("tr");
-      var detailRow=document.createElement("tr");
-      detailRow.className="crew-detail-row";
-      detailRow.setAttribute("data-crew-index",String(idx));
-      var detailCell=document.createElement("td");
-      detailCell.colSpan=12;
-      var detail=document.createElement("div");
-      detail.className="crew-detail";
-      var close=document.createElement("button");
-      close.type="button"; close.className="crew-detail-close"; close.textContent="Close";
-      var detailText=document.createElement("div");
-      detailText.className="crew-detail-text";
-      detailText.textContent=crewLimitTitle(row,row.crewInfo);
-      close.addEventListener("click",function(){ detailRow.remove(); });
-      detail.appendChild(close); detail.appendChild(detailText); detailCell.appendChild(detail); detailRow.appendChild(detailCell);
-      flightRow.insertAdjacentElement("afterend",detailRow);
+      selectedCrewFlight=(selectedCrewFlight===row.flight ? null : row.flight);
+      render();
     });
   });
+  if(selectedCrewFlight){
+    var selectedIdx=state.rows.findIndex(function(r){ return r.flight===selectedCrewFlight; });
+    if(selectedIdx>=0 && state.rows[selectedIdx].crewInfo){
+      var selectedBtn=rowsEl.querySelector(".crew-limit-btn[data-crew-index='"+selectedIdx+"']");
+      if(selectedBtn) insertCrewDetail(selectedBtn,state.rows[selectedIdx],selectedIdx);
+    } else selectedCrewFlight=null;
+  }
 }
 
 async function start(){
