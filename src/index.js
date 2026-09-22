@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v38",
+    version: "v39",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v38",
+    version: "v39",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v38", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v39", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v38",
+      version: "v39",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v38", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v39", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v38",
+    version: "v39",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -443,7 +443,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v38</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v39</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -624,25 +624,32 @@ function crewDetailData(f,ci){
   var ai=f.augmentationInfo;
   var lines=[f.flight+" "+f.route+" — original crew "+ci.crew+" pilots",
     "Original report: "+fmt(ci.report),
-    "Scheme max FDP: "+minToBlock(ci.maxFdp),
-    "Scheme latest departure: "+fmt(ci.latest),
+    ci.crew+" crew Scheme max FDP: "+minToBlock(ci.maxFdp),
+    ci.crew+" crew Scheme latest departure: "+fmt(ci.latest),
     "BLR "+ci.crew+" crew ("+ci.blrOriginalBox+") max FDP: "+minToBlock(ci.blrOriginalFdp),
-    "BLR latest departure: "+fmt(ci.blrOriginalLatest),
+    "BLR "+ci.crew+" crew latest departure: "+fmt(ci.blrOriginalLatest),
     "Original operating limit: "+fmt(ci.originalOperationalLatest)+" ("+ci.originalLimiter+")",
     "Block: "+minToBlock(f.block)];
   if(ci.crew===4){
     lines.push("Already 4 pilots — an additional HSB pilot does not extend the 4 crew limit.");
     if(ai){
-      lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
-      lines.push("Your HSB BLR 19h latest departure: "+fmt(ai.blrLatest));
+      // The HSB pilot's personal Scheme ceiling is a separate standby-derived
+      // constraint. Only show it when it actually limits the usable departure;
+      // otherwise it is liable to be confused with the flight's 4-crew Scheme limit.
+      if(ai.limiter==="Scheme / OM A") lines.push("HSB pilot personal Scheme ceiling: "+fmt(ai.schemeLatest));
+      lines.push("HSB BLR 19h latest departure: "+fmt(ai.blrLatest));
     }
     lines.push("Usable FDP extension: 0m");
   }else if(ai){
     lines.push("With HSB pilot: "+ci.augmentedCrew+" pilots");
+    lines.push(ci.augmentedCrew+" crew Scheme max FDP: "+minToBlock(ci.augmentedFdp));
+    lines.push(ci.augmentedCrew+" crew Scheme latest departure: "+fmt(ci.augmentedLatest));
     lines.push(ci.augmentedCrew+" crew BLR ("+ci.blrAugmentedBox+") max FDP: "+minToBlock(ci.blrAugmentedFdp));
     lines.push(ci.augmentedCrew+" crew BLR latest departure: "+fmt(ci.blrAugmentedLatest));
-    lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
-    lines.push("Your HSB BLR 19h latest departure: "+fmt(ai.blrLatest));
+    // Keep the standby-derived personal Scheme ceiling distinct from the
+    // flight's crew-category Scheme limit, and only display it if it constrains.
+    if(ai.limiter==="Scheme / OM A") lines.push("HSB pilot personal Scheme ceiling: "+fmt(ai.schemeLatest));
+    lines.push("HSB BLR 19h latest departure: "+fmt(ai.blrLatest));
     if(ai.extension>0) lines.push("Usable FDP extension: +"+dur(ai.extension)+" → "+fmt(ai.usableLatest));
     else lines.push("Usable FDP extension: 0m — calling you adds no later departure capability.");
   }
