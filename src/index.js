@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v28",
+    version: "v29",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v28",
+    version: "v29",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v28", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v29", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v28",
+      version: "v29",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v28", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v29", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v28",
+    version: "v29",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -442,7 +442,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v28</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v29</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -676,12 +676,18 @@ function saveSessionOnPageHide(){
 }
 
 async function loadSessionFromServer(){
+  var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  var timer = controller ? setTimeout(function(){ controller.abort(); }, 2500) : null;
   try {
-    var res = await fetch("/api/session", { cache: "no-store" });
+    var opts = { cache: "no-store" };
+    if (controller) opts.signal = controller.signal;
+    var res = await fetch("/api/session", opts);
     var data = await res.json();
     if (data && data.ok && data.session && data.date === todayIso()) return data.session;
   } catch (e) {
-    console.warn("Session load failed", e);
+    console.warn("Session load failed; using local/default state", e);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   return null;
 }
@@ -975,6 +981,9 @@ function render(){
 }
 
 async function start(){
+  // Paint a usable app immediately. Remote session restore must never block startup.
+  byId("utcClock").textContent = utcNowText();
+  parseAndRender();
   byId("parseBtn").addEventListener("click", parseAndRender);
   byId("statusBtn").addEventListener("click", refreshStatus);
   byId("usageBtn").addEventListener("click", checkUsage);
