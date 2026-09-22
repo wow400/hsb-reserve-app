@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v30",
+    version: "v34",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v30",
+    version: "v34",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v30", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v34", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v30",
+      version: "v34",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v30", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v34", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v30",
+    version: "v34",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -443,7 +443,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v32</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v34</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -452,7 +452,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Crew limit</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
-  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Crew limit = latest departure with the original crew complement, using scheduled block as the working proxy for flight time. Tap the time for the FDP calculation. Call by = earlier of the existing HSB 19h latest-call calculation or HSB finish. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
+  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Crew limit = latest departure with the original crew complement, using scheduled block as the working proxy for flight time. Tap the time for the FDP calculation, including the usable extension after your Scheme/OM A HSB limit and BLR 19h limit are applied. Call by = earlier of the existing HSB 19h latest-call calculation or HSB finish. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -526,11 +526,79 @@ function crewLimitState(f,ci){
   if(ci.latest-etd<=30)return "warn";
   return "";
 }
+function initialNightWindowEnd(hsbStart){
+  var m=((hsbStart%1440)+1440)%1440;
+  var dayBase=hsbStart-m;
+  if(m<7*60)return dayBase+7*60;
+  if(m>=23*60)return dayBase+1440+7*60;
+  return null;
+}
+function countedHsbForScheme(hsbStart,reportTime,contactTime){
+  var elapsed=Math.max(0,reportTime-hsbStart);
+  var nightEnd=initialNightWindowEnd(hsbStart);
+  if(nightEnd===null)return elapsed;
+  // OM A 7.14.2(v)(d): when HSB starts 2300-0700, the part of that
+  // initial 2300-0700 window before BA contacts the pilot does not count
+  // towards the HSB FDP reduction.
+  var excluded=Math.max(0,Math.min(contactTime,nightEnd)-hsbStart);
+  return Math.max(0,elapsed-excluded);
+}
+function schemeLatestDepartureForHsb(f,ci,hsbStart,hsbEnd){
+  if(!ci)return null;
+  var latest=null;
+  // We use the agreed app convention: two hours from call to LHR, and for
+  // this capability calculation arrival/report at LHR is treated as the
+  // earliest departure point. Augmented A380 duties use in-flight rest, so
+  // the HSB reduction threshold is 8 hours (OM A 7.14.2(v)(c)).
+  var firstPossible=hsbStart+CALL_BEFORE_TAKEOFF;
+  var searchEnd=hsbStart+36*60;
+  for(var departure=firstPossible;departure<=searchEnd;departure++){
+    var latestContact=Math.min(departure-CALL_BEFORE_TAKEOFF,hsbEnd);
+    if(latestContact<hsbStart)continue;
+    var countedStandby=countedHsbForScheme(hsbStart,departure,latestContact);
+    var reduction=Math.max(0,countedStandby-8*60);
+    var availableFdp=ci.augmentedFdp-reduction;
+    if(f.block<=availableFdp)latest=departure;
+  }
+  return latest;
+}
+function hsbAugmentationInfo(f,ci,hsbStart,hsbEnd){
+  if(!ci)return null;
+  var blrLatest=hsbStart+HSB_TO_CHOCKS_LIMIT-f.block;
+  var schemeLatest=schemeLatestDepartureForHsb(f,ci,hsbStart,hsbEnd);
+  if(schemeLatest===null)schemeLatest=-999999;
+  if(ci.crew===4){
+    return {crewLatest:ci.augmentedLatest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:ci.latest,extension:0,limiter:"Already 4 pilots"};
+  }
+  var usableLatest=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
+  var extension=Math.max(0,usableLatest-ci.latest);
+  var limiter="Crew-complement FDP";
+  var minVal=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
+  if(minVal===blrLatest)limiter="BLR 19h";
+  else if(minVal===schemeLatest)limiter="Scheme / OM A";
+  return {crewLatest:ci.augmentedLatest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:usableLatest,extension:extension,limiter:limiter};
+}
 function crewLimitTitle(f,ci){
-  var ext=ci.augmentedLatest-ci.latest;
+  var ai=f.augmentationInfo;
   var lines=[f.flight+" "+f.route+" — original crew "+ci.crew+" pilots","Original report: "+fmt(ci.report),"Max FDP: "+minToBlock(ci.maxFdp),"FDP expires: "+fmt(ci.expiry),"Block: "+minToBlock(f.block),"Original crew latest departure: "+fmt(ci.latest)];
-  if(ci.crew===4) lines.push("Already 4 pilots — an additional HSB pilot does not extend the crew-complement FDP limit.");
-  else lines.push("With HSB pilot: "+ci.augmentedCrew+" pilots · theoretical crew-complement limit "+fmt(ci.augmentedLatest)+" ("+dur(ext)+" later), before applying the HSB pilot’s own FDP limit.");
+  if(ci.crew===4){
+    lines.push("Already 4 pilots — an additional HSB pilot does not extend the crew-complement FDP limit.");
+    if(ai){
+      lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
+      lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
+    }
+    lines.push("Usable FDP extension: 0m");
+  }else if(ai){
+    lines.push("With HSB pilot: "+ci.augmentedCrew+" pilots");
+    lines.push("Crew-complement limit: "+fmt(ai.crewLatest));
+    lines.push("Your Scheme / OM A latest departure: "+fmt(ai.schemeLatest));
+    lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
+    if(ai.extension>0){
+      lines.push("Usable FDP extension: +"+dur(ai.extension)+" → "+fmt(ai.usableLatest)+" (limited by "+ai.limiter+")");
+    }else{
+      lines.push("Usable FDP extension: 0m — calling you adds no later departure capability.");
+    }
+  }
   return lines.join("\\n");
 }
 var COST_PER_FLIGHT_USD = 0.005;
@@ -875,6 +943,7 @@ function computeRows(){
     var cannotCover = cannotCoverFromHsb(f, hsbStart);
     var row = Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs, cannotCoverFromThisHsb:cannotCover });
     row.crewInfo = crewInfo(row);
+    row.augmentationInfo = hsbAugmentationInfo(row,row.crewInfo,hsbStart,hsbEnd);
     return row;
   });
   return { rows:rows, hsbStart:hsbStart, hsbEnd:hsbEnd, latestOnBlocks:latestOnBlocks, now:now, hsbStartDelta:hsbStartDelta, hsbFinishDelta:hsbFinishDelta, hsbNotStarted:hsbNotStarted, hsbFinished:hsbFinished };
