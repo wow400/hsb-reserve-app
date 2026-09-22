@@ -1,8 +1,8 @@
-# HSB Reserve App v30
+# HSB Reserve App v31
 
 Built from the working v26 source.
 
-Changes in v30:
+Changes in v31:
 - Adds one-line table columns in this order: Flight / Route / 2hrs b4 Report / Report / T/O / Arr / Block / Call by / Status / Countdown / Checks.
 - Report uses the original scheduled A380 T5 report time for each flight and does not move when FICO/FlightAware shows a delay or revised ETD.
 - `2hrs b4 Report` is calculated from that fixed original report time and displayed in Heathrow local time with a lower-case `l`; BST/GMT is handled dynamically with the `Europe/London` timezone.
