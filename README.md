@@ -1,11 +1,11 @@
-# HSB Reserve App v37
+# HSB Reserve App v38
 
-Clean build from v36.
+Cloudflare Worker app. Upload both `src/index.js` and `src/index.mjs` to the repository `src` folder.
 
-## v37 changes
-
-- Removes the permanent Crew limit column; the original-crew limit remains in the flight FDP detail.
-- Makes Call by the tappable field that opens/closes the inline FDP detail beneath the selected flight.
-- Highlights the rule that actually determines Call by: 3/4 crew FDP, Scheme / OM A, BLR 19h, or HSB finish.
-- Keeps the full original-crew, augmented-crew, Scheme and BLR calculations in the detail panel.
-- No FDP or callability calculation logic changed from v36.
+## v38 changes
+- Adds industrial BLR FDP limits for the six A380 trips.
+- Original operating limit now uses the earlier of BLR and Scheme.
+- Uses Box A for 2 crew, Box C (+3h) for 3 crew, and Box D to Scheme for 4 crew.
+- BLR calculations include the 30-minute post-arrival clear.
+- HSB augmentation and Call by now use the augmented BLR crew limit as well as the HSB pilot Scheme and 19h limits.
+- FDP detail panel shows original Scheme and BLR limits and highlights the actual limiting rule.
