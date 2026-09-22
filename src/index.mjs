@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v34",
+    version: "v35",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v34",
+    version: "v35",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v34", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v35", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v34",
+      version: "v35",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v34", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v35", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v34",
+    version: "v35",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -443,7 +443,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v34</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v35</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -452,7 +452,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Crew limit</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
-  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Crew limit = latest departure with the original crew complement, using scheduled block as the working proxy for flight time. Tap the time for the FDP calculation, including the usable extension after your Scheme/OM A HSB limit and BLR 19h limit are applied. Call by = earlier of the existing HSB 19h latest-call calculation or HSB finish. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
+  <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Crew limit = latest departure with the original crew complement, using scheduled block as the working proxy for flight time. Tap the time for the FDP calculation, including the usable extension after your Scheme/OM A HSB limit and BLR 19h limit are applied. Call by = latest useful contact time after the crew-complement FDP, your Scheme/OM A HSB limit, BLR 19h limit, two-hour travel time and HSB finish are all applied. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
 </section>
 </main>
 <script>
@@ -568,7 +568,15 @@ function hsbAugmentationInfo(f,ci,hsbStart,hsbEnd){
   var schemeLatest=schemeLatestDepartureForHsb(f,ci,hsbStart,hsbEnd);
   if(schemeLatest===null)schemeLatest=-999999;
   if(ci.crew===4){
-    return {crewLatest:ci.augmentedLatest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:ci.latest,extension:0,limiter:"Already 4 pilots"};
+    // A fifth pilot does not increase the crew-complement FDP limit, but if
+    // the HSB pilot is replacing sickness their own Scheme and BLR limits
+    // still determine how late they personally could operate the flight.
+    var replacementLatest=Math.min(ci.latest,schemeLatest,blrLatest);
+    var replacementLimiter="Original 4-pilot FDP";
+    var replacementMin=Math.min(ci.latest,schemeLatest,blrLatest);
+    if(replacementMin===blrLatest)replacementLimiter="BLR 19h";
+    else if(replacementMin===schemeLatest)replacementLimiter="Scheme / OM A";
+    return {crewLatest:ci.latest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:replacementLatest,extension:0,limiter:replacementLimiter};
   }
   var usableLatest=Math.min(ci.augmentedLatest,schemeLatest,blrLatest);
   var extension=Math.max(0,usableLatest-ci.latest);
@@ -577,6 +585,15 @@ function hsbAugmentationInfo(f,ci,hsbStart,hsbEnd){
   if(minVal===blrLatest)limiter="BLR 19h";
   else if(minVal===schemeLatest)limiter="Scheme / OM A";
   return {crewLatest:ci.augmentedLatest,schemeLatest:schemeLatest,blrLatest:blrLatest,usableLatest:usableLatest,extension:extension,limiter:limiter};
+}
+function callabilityFromHsb(f,hsbStart,hsbEnd){
+  var ci=crewInfo(f);
+  var ai=hsbAugmentationInfo(f,ci,hsbStart,hsbEnd);
+  var blrLatest=hsbStart+HSB_TO_CHOCKS_LIMIT-f.block;
+  var usableDeparture=ai ? ai.usableLatest : blrLatest;
+  var latestUsefulCall=usableDeparture-CALL_BEFORE_TAKEOFF;
+  var callBy=Math.min(latestUsefulCall,hsbEnd);
+  return {crewInfo:ci,augmentationInfo:ai,usableDeparture:usableDeparture,latestUsefulCall:latestUsefulCall,callBy:callBy,tooLate:callBy<hsbStart};
 }
 function crewLimitTitle(f,ci){
   var ai=f.augmentationInfo;
@@ -588,6 +605,11 @@ function crewLimitTitle(f,ci){
       lines.push("Your BLR 19h latest departure: "+fmt(ai.blrLatest));
     }
     lines.push("Usable FDP extension: 0m");
+    if(f.tooLateFromThisHsb){
+      lines.push("Earliest HSB arrival: "+fmt(f.hsbStartForDetail+CALL_BEFORE_TAKEOFF)+" — later than your usable departure limit, so this flight cannot use you from this HSB.");
+    }else{
+      lines.push("Latest useful call: "+fmt(f.callBy)+" (includes 2h travel and HSB finish).");
+    }
   }else if(ai){
     lines.push("With HSB pilot: "+ci.augmentedCrew+" pilots");
     lines.push("Crew-complement limit: "+fmt(ai.crewLatest));
@@ -597,6 +619,11 @@ function crewLimitTitle(f,ci){
       lines.push("Usable FDP extension: +"+dur(ai.extension)+" → "+fmt(ai.usableLatest)+" (limited by "+ai.limiter+")");
     }else{
       lines.push("Usable FDP extension: 0m — calling you adds no later departure capability.");
+    }
+    if(f.tooLateFromThisHsb){
+      lines.push("Earliest HSB arrival: "+fmt(f.hsbStartForDetail+CALL_BEFORE_TAKEOFF)+" — later than the usable departure limit, so this flight cannot use you from this HSB.");
+    }else{
+      lines.push("Latest useful call: "+fmt(f.callBy)+" (includes 2h travel and HSB finish).");
     }
   }
   return lines.join("\\n");
@@ -841,18 +868,20 @@ async function refreshStatus(){
     return;
   }
   var hsbStartForRefresh = toMin(byId("hsbStart").value);
-  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh) && !alreadyConfirmedAirborne(f); }).length;
+  var hsbEndForRefresh = normaliseEnd(hsbStartForRefresh, toMin(byId("hsbEnd").value));
+  var refreshableCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh) && !alreadyConfirmedAirborne(f) && !callabilityFromHsb(f,hsbStartForRefresh,hsbEndForRefresh).tooLate; }).length;
   var estimated = refreshableCount * COST_PER_FLIGHT_USD;
-  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled, cannot-cover and confirmed taken-off flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
+  var ok = confirm("Refresh live status for " + refreshableCount + " flights? Estimated maximum cost " + money(estimated) + ". FICO-cancelled, cannot-cover, too-late-from-HSB and confirmed taken-off flights are not queried. Cached results may cost less. Monthly app cap is $" + Number(usageGuard.cap_usd).toFixed(2) + ".");
   if (!ok) {
     byId("parseNote").textContent = "Live refresh cancelled. No AeroAPI calls made.";
     return;
   }
   try {
     var hsbStartForRefresh = toMin(byId("hsbStart").value);
-    var refreshable = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh) && !alreadyConfirmedAirborne(f); });
+    var hsbEndForRefresh = normaliseEnd(hsbStartForRefresh, toMin(byId("hsbEnd").value));
+    var refreshable = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForRefresh) && !alreadyConfirmedAirborne(f) && !callabilityFromHsb(f,hsbStartForRefresh,hsbEndForRefresh).tooLate; });
     if (!refreshable.length) {
-      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are cancelled, cannot be covered from this HSB, or are already confirmed taken off.";
+      byId("parseNote").textContent = "No AeroAPI calls made. All parsed flights are cancelled, cannot be covered from this HSB, are already too late to use from this HSB, or are already confirmed taken off.";
       return;
     }
     var meta = {};
@@ -912,11 +941,13 @@ function parseAndRender(){
   flights = nextFlights;
   statuses = nextStatuses;
   var hsbStartForSummary = toMin(byId("hsbStart").value);
+  var hsbEndForSummary = normaliseEnd(hsbStartForSummary, toMin(byId("hsbEnd").value));
   var cancelledCount = flights.filter(function(f){ return f.ficoCancelled; }).length;
   var cannotCoverCount = flights.filter(function(f){ return !f.ficoCancelled && cannotCoverFromHsb(f, hsbStartForSummary); }).length;
   var airborneCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForSummary) && alreadyConfirmedAirborne(f); }).length;
-  var refreshableCount = flights.length - cancelledCount - cannotCoverCount - airborneCount;
-  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. " + cannotCoverCount + " cannot cover. " + airborneCount + " already taken off. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
+  var tooLateCount = flights.filter(function(f){ return !f.ficoCancelled && !cannotCoverFromHsb(f, hsbStartForSummary) && !alreadyConfirmedAirborne(f) && callabilityFromHsb(f,hsbStartForSummary,hsbEndForSummary).tooLate; }).length;
+  var refreshableCount = flights.length - cancelledCount - cannotCoverCount - airborneCount - tooLateCount;
+  byId("parseNote").textContent = "Parsed " + flights.length + " flights. " + cancelledCount + " FICO-cancelled. " + cannotCoverCount + " cannot cover. " + tooLateCount + " too late from this HSB. " + airborneCount + " already taken off. Estimated max refresh cost: " + money(refreshableCount * COST_PER_FLIGHT_USD) + ".";
   render();
   queueSaveSession();
 }
@@ -935,15 +966,16 @@ function computeRows(){
   var hsbFinished = hsbFinishDelta < 0;
   var rows = flights.map(function(f){
     var latestTO = latestOnBlocks - f.block;
-    var latestCall = latestTO - CALL_BEFORE_TAKEOFF;
-    var callBy = Math.min(latestCall, hsbEnd);
-    var callByReason = hsbEnd < latestCall ? "HSB finish" : "Latest call";
-    var delta = futureDelta(callBy, now);
+    var capability=callabilityFromHsb(f,hsbStart,hsbEnd);
+    var latestCall = capability.latestUsefulCall;
+    var callBy = capability.callBy;
+    var callByReason = capability.tooLate ? "Latest useful call is before HSB starts" : (hsbEnd<=latestCall ? "HSB finish" : "Latest useful FDP/BLR call");
+    var delta = capability.tooLate ? -1 : futureDelta(callBy, now);
     var fs = f.ficoCancelled ? { status:"cancelled", found:true, label:"Cancelled", safe_by_status:true, source:"fico" } : (statuses[f.flight] || { status:"no_live_refresh", found:false, label:null, safe_by_status:false });
     var cannotCover = cannotCoverFromHsb(f, hsbStart);
-    var row = Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs, cannotCoverFromThisHsb:cannotCover });
-    row.crewInfo = crewInfo(row);
-    row.augmentationInfo = hsbAugmentationInfo(row,row.crewInfo,hsbStart,hsbEnd);
+    var row = Object.assign({}, f, { latestOnBlocks:latestOnBlocks, latestTO:latestTO, latestCall:latestCall, callBy:callBy, callByReason:callByReason, delta:delta, fs:fs, cannotCoverFromThisHsb:cannotCover, tooLateFromThisHsb:capability.tooLate, hsbStartForDetail:hsbStart });
+    row.crewInfo = capability.crewInfo;
+    row.augmentationInfo = capability.augmentationInfo;
     return row;
   });
   return { rows:rows, hsbStart:hsbStart, hsbEnd:hsbEnd, latestOnBlocks:latestOnBlocks, now:now, hsbStartDelta:hsbStartDelta, hsbFinishDelta:hsbFinishDelta, hsbNotStarted:hsbNotStarted, hsbFinished:hsbFinished };
@@ -959,15 +991,16 @@ function scheduledEtdPassed(f,state){
 function operationalStatus(f,state){
   if (f.fs && f.fs.safe_by_status) return f.fs.label || "Departed";
   if (f.cannotCoverFromThisHsb) return ">19h from HSB";
+  if (f.tooLateFromThisHsb) return "Too late";
   if (state.hsbFinished || f.delta < 0) return "Safe";
   if (apiHasUsefulStatus(f)) return f.fs.label;
   if (f.fs && f.fs.status === "no_live_refresh" && scheduledEtdPassed(f,state)) return "Past ETD — refresh";
   if (state.now >= f.schedTO) return "Unknown";
   return "Planned";
 }
-function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || f.cannotCoverFromThisHsb || state.hsbFinished || f.delta < 0; }
+function isSafe(f,state){ return (f.fs && f.fs.safe_by_status) || f.cannotCoverFromThisHsb || f.tooLateFromThisHsb || state.hsbFinished || f.delta < 0; }
 function dotClassFor(f,state){
-  if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "dot-green";
+  if (f.cannotCoverFromThisHsb || f.tooLateFromThisHsb || (f.fs && f.fs.safe_by_status)) return "dot-green";
   if(state.hsbNotStarted)return"dot-blue";
   if(isSafe(f,state))return"dot-green";
   if(f.delta<=30)return"dot-red";
@@ -976,14 +1009,14 @@ function dotClassFor(f,state){
   return"dot-amber";
 }
 function rowClassFor(f,state){
-  if (f.cannotCoverFromThisHsb || (f.fs && f.fs.safe_by_status)) return "row-departed";
+  if (f.cannotCoverFromThisHsb || f.tooLateFromThisHsb || (f.fs && f.fs.safe_by_status)) return "row-departed";
   if(state.hsbNotStarted)return"row-pre";
   if(isSafe(f,state))return f.fs && f.fs.safe_by_status ? "row-departed" : "row-safe";
   if(f.delta<=30)return"row-critical";
   if (f.fs && f.fs.status === "no_live_refresh") return "";
   return"row-live";
 }
-function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-unknown"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s===">19h from HSB")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
+function statusClass(f,state){ var s=operationalStatus(f,state); if(s==="Planned")return"status-planned"; if(s==="Past ETD — refresh")return"status-unknown"; if(s==="Delayed")return"status-delayed"; if(s==="Safe"||s==="Departed"||s==="Cancelled"||s==="Diverted"||s===">19h from HSB"||s==="Too late")return"status-safe"; if(s==="Unknown")return"status-unknown"; return"status-live"; }
 function countdownText(f,state){
   if(isSafe(f,state))return"Safe";
   if(f.delta < 0)return"Expired";
@@ -1037,7 +1070,7 @@ function render(){
       "<td>" + fmtShort(f.schedTO) + "</td>" +
       "<td>" + minToBlock(f.block) + "</td>" +
       "<td>" + (f.crewInfo ? "<button class='crew-limit-btn " + crewLimitState(f,f.crewInfo) + "' data-crew-index='" + i + "'>" + fmt(f.crewInfo.latest) + "</button>" : "—") + "</td>" +
-      "<td><span class='badge " + callBadge + "' title='" + f.callByReason + "'>" + fmt(f.callBy) + "</span></td>" +
+      "<td><span class='badge " + callBadge + "' title='" + f.callByReason + "'>" + (f.tooLateFromThisHsb ? "Too late" : fmt(f.callBy)) + "</span></td>" +
       "<td class='" + statusClass(f,state) + "'>" + statusHtml(f,state) + "</td>" +
       "<td>" + countdownText(f,state) + "</td>" +
       "<td>" + checksHtml(f.flight) + "</td>";
