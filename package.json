@@ -1,6 +1,6 @@
 {
   "name": "hsb-reserve-app",
-  "version": "38.0.0",
+  "version": "39.0.0",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy"
