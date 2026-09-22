@@ -431,6 +431,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 .checks{display:flex;gap:6px}.check-link{display:inline-block;text-decoration:none;background:#05080c;border:1px solid #244b78;padding:5px 7px;border-radius:7px;font-size:.78rem;font-weight:900;line-height:1}.check-link.ba{color:#fff;border-color:#555}.check-link.lhr{color:#d8b4ff;border-color:#5b3f85}.check-link.fa{color:#74b9ff;border-color:#244b78}
 .legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;color:#c9d1d9;font-size:.82rem}.legend span{display:inline-flex;gap:6px;align-items:center}.note{padding:10px 12px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--line);line-height:1.35}
 .errorbox{display:none;padding:10px 14px;border:1px solid rgba(255,75,75,.5);background:rgba(255,75,75,.08);border-radius:12px;margin-bottom:12px;color:#ffb8b8}
+.crew-detail{display:none;margin:10px 12px 0;padding:11px 13px;background:#f7f8fb;color:#111;border-radius:12px;border:1px solid #cfd7e2;line-height:1.35;white-space:pre-line;position:relative}.crew-detail.show{display:block}.crew-detail-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#1677c8;padding:4px 7px;font-size:.84rem}.crew-detail-text{padding-right:48px}
 @media(max-width:800px){body{padding:7px}.app{padding-top:4px}.header{grid-template-columns:1fr;gap:8px;margin-bottom:8px}h1{font-size:1.42rem}.sub{font-size:.82rem;line-height:1.3}.controls{grid-template-columns:1fr 1fr 1fr;gap:5px}.control{padding:7px 5px}.control label{font-size:.62rem}.control input,select{font-size:1rem}.clock{font-size:1.08rem}.fico{padding:10px}.fico-grid{grid-template-columns:1fr;gap:9px}textarea{min-height:92px;font-size:.74rem;padding:8px}.button-col{gap:8px}button{padding:10px;font-size:.86rem}.parse-note{font-size:.74rem;margin-top:2px}.guard{grid-template-columns:1fr}.table-scroll{margin:0}table{font-size:.76rem;min-width:1080px}th,td{padding:6px 4px}th{font-size:.66rem}.dot{width:15px;height:15px}.checks{gap:4px}.check-link{padding:4px 5px;font-size:.7rem}.badge{padding:2px 5px}.legend{gap:10px;padding:9px 10px;font-size:.74rem}.note{font-size:.72rem;padding:9px 10px}}
 @media(max-width:480px){body{padding:5px}.controls{gap:4px}.control{padding:6px 3px}.fico{padding:8px}textarea{min-height:82px}.table-scroll{border-top:1px solid var(--line)}table{font-size:.72rem;min-width:1040px}th,td{padding:5px 3px}.legend{gap:8px}.legend .dot{width:14px;height:14px}}
 
@@ -442,7 +443,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v30</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v31</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
@@ -450,6 +451,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <section class="card fico"><div class="fico-grid"><div><label for="ficoInput">Paste BA/FICO flight list</label><textarea id="ficoInput" spellcheck="false">${esc(DEFAULT_FICO)}</textarea></div><div class="button-col"><button class="primary" id="parseBtn">Parse FICO list</button><button class="danger" id="statusBtn">Refresh live status</button><div id="parseNote" class="parse-note">No automatic paid polling.</div></div></div></section>
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Crew limit</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div id="crewDetail" class="crew-detail"><button id="crewDetailClose" class="crew-detail-close" type="button">Close</button><div id="crewDetailText" class="crew-detail-text"></div></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
   <div class="note">2hrs b4 Report = Heathrow local time (lower-case l), two hours before the original scheduled report. Report stays tied to the original rostered departure and does not move with delays/revised ETDs. Report/T/O are Zulu. Crew limit = latest departure with the original crew complement, using scheduled block as the working proxy for flight time. Tap the time for the FDP calculation. Call by = earlier of the existing HSB 19h latest-call calculation or HSB finish. Green = safe/no longer callable. Amber = still callable with more than 30m remaining. Red = call deadline within 30m. Grey = live status unknown or refresh needed. Delay/New ETD is shown separately in Status. BA/LHR/FA open external checks.</div>
 </section>
@@ -975,7 +977,10 @@ function render(){
   rowsEl.querySelectorAll(".crew-limit-btn").forEach(function(btn){
     btn.addEventListener("click",function(){
       var idx=Number(btn.getAttribute("data-crew-index")); var row=state.rows[idx];
-      if(row && row.crewInfo) alert(crewLimitTitle(row,row.crewInfo));
+      if(row && row.crewInfo){
+        byId("crewDetailText").textContent = crewLimitTitle(row,row.crewInfo);
+        byId("crewDetail").classList.add("show");
+      }
     });
   });
 }
@@ -987,6 +992,7 @@ async function start(){
   byId("parseBtn").addEventListener("click", parseAndRender);
   byId("statusBtn").addEventListener("click", refreshStatus);
   byId("usageBtn").addEventListener("click", checkUsage);
+  byId("crewDetailClose").addEventListener("click", function(){ byId("crewDetail").classList.remove("show"); });
   byId("hsbStart").addEventListener("input", function(){
     localStorage.setItem(HSB_START_KEY, byId("hsbStart").value);
     render();
