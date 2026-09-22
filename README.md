@@ -1,14 +1,13 @@
-# HSB Reserve App v34
+# HSB Reserve App v35
 
-Clean build from v33.
+Clean build from v34.
 
-## v34 changes
-- Keeps the existing original-crew **Crew limit** calculation.
-- FDP detail now calculates the actual augmentation benefit of an HSB pilot.
-- Applies the augmented A380 Class 1 Scheme/OM A FDP limit, including the HSB 8-hour reduction threshold and the 2300–0700 start exception.
-- Applies the BLR HSB duty limit as the existing practical 19-hour HSB-start-to-arrival/chocks envelope (the BLR text states 19½ hours to 30 minutes after arrival).
-- Shows **Usable FDP extension** and the resulting latest departure, with the limiting rule identified.
-- SIN remains a 4-pilot trip, so an additional pilot gives no crew-complement FDP extension.
+## v35 changes
+- **Call by** now means the latest time BA can actually contact you and still use you on that flight.
+- It applies, together, the crew-complement FDP limit, your Scheme/OM A HSB-adjusted limit, the BLR 19-hour-to-chocks envelope, the fixed 2-hour travel time, and HSB finish.
+- If the latest useful call is before HSB starts, the row shows **Too late** and is treated as safe/not callable from that HSB.
+- The FDP detail panel shows the resulting latest useful call (or explains why the flight is already too late).
+- For SIN/other 4-pilot cases, an extra pilot does not extend crew FDP, but your own Scheme/BLR limits are still applied if you were replacing sickness.
 - Both `src/index.js` and `src/index.mjs` are identical.
 
 Deploy as before with `npx wrangler deploy`.
