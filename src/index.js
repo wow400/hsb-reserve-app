@@ -50,7 +50,7 @@ function roundMoney(n) {
 async function handleDebug(env) {
   return json({
     ok: true,
-    version: "v40",
+    version: "v42",
     has_usage_kv: !!env.USAGE_KV,
     has_flightaware_key: !!env.FLIGHTAWARE_API_KEY,
     cap_usd: MONTHLY_CAP_USD,
@@ -66,7 +66,7 @@ async function handleUsage(env) {
   const usage = await readUsage(env);
   return json({
     ok: true,
-    version: "v40",
+    version: "v42",
     month: monthKey(),
     cap_usd: MONTHLY_CAP_USD,
     used_usd: usage.cost_usd,
@@ -93,11 +93,11 @@ async function handleSession(request, env) {
   if (request.method === "GET") {
     const stored = await env.USAGE_KV.get(sessionKey(), "json");
     if (!stored || stored.date !== utcDateKey() || !stored.session) {
-      return json({ ok: true, version: "v40", date: utcDateKey(), session: null });
+      return json({ ok: true, version: "v42", date: utcDateKey(), session: null });
     }
     return json({
       ok: true,
-      version: "v40",
+      version: "v42",
       date: utcDateKey(),
       saved_at: stored.saved_at || null,
       session: stored.session
@@ -147,7 +147,7 @@ async function handleSession(request, env) {
       session: clean
     }), { expirationTtl: 60 * 60 * 24 * 3 });
 
-    return json({ ok: true, version: "v40", date: utcDateKey(), saved_at: nowIso });
+    return json({ ok: true, version: "v42", date: utcDateKey(), saved_at: nowIso });
   }
 
   return json({ ok: false, error: "Method not allowed" }, 405);
@@ -241,7 +241,7 @@ async function handleStatus(request, env) {
 
   return json({
     ok: true,
-    version: "v40",
+    version: "v42",
     source: "flightaware_aeroapi",
     updated: new Date().toISOString(),
     used_usd: usage.cost_usd,
@@ -422,8 +422,8 @@ body{margin:0;padding:14px;background:radial-gradient(circle at top,#101923 0,#0
 h1{margin:0;font-size:1.65rem}.version{font-size:.78rem;background:#102742;color:#80bdff;border:1px solid #1e4774;border-radius:8px;padding:4px 7px;margin-left:8px;vertical-align:4px}.sub{margin:6px 0 0;color:var(--muted);font-size:.95rem}
 .controls{display:grid;grid-template-columns:120px 120px 140px;gap:8px}.control{background:linear-gradient(#101923,#0a1017);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.control label{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase;margin-bottom:4px}.control input,select{width:100%;border:0;background:transparent;color:var(--blue);font-weight:900;font-size:1.18rem;text-align:center}.clock{font-weight:900;font-size:1.28rem;color:#fff}
 .card{background:rgba(11,17,24,.94);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.28);overflow:hidden;margin-bottom:12px}.guard{padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.ok{color:var(--green)!important}.bad{color:var(--red)!important}
-.fico{padding:14px 16px}.fico-grid{display:grid;grid-template-columns:1fr 230px;gap:14px}.fico label{display:block;color:var(--ink);font-weight:900;font-size:.82rem;margin-bottom:6px}textarea{width:100%;min-height:130px;background:#f9fbff;color:#111;border:1px solid #cfd7e2;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.25}.button-col{display:flex;flex-direction:column;gap:10px}
-button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}button.danger{border-color:#765025;color:#ffc400}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
+.fico{padding:14px 16px}.fico-grid{display:grid;grid-template-columns:1fr 230px;gap:14px}.fico-label-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}.fico label{display:block;color:var(--ink);font-weight:900;font-size:.82rem;margin:0}.select-fico-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);padding:2px 0;font-size:.76rem;font-weight:800;white-space:nowrap;cursor:pointer}.select-fico-btn:focus-visible{outline:2px solid var(--blue);outline-offset:4px;border-radius:6px}.select-fico-radio{width:15px;height:15px;border-radius:50%;border:2px solid #7f8b98;display:inline-block;position:relative;background:transparent;flex:0 0 auto}.select-fico-btn.selected{color:var(--blue)}.select-fico-btn.selected .select-fico-radio{border-color:var(--blue)}.select-fico-btn.selected .select-fico-radio:after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--blue)}textarea{width:100%;min-height:130px;background:#f9fbff;color:#111;border:1px solid #cfd7e2;border-radius:12px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.25}.button-col{display:flex;flex-direction:column;gap:10px}
+button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:#0b1a2b;color:#74b9ff;font-weight:900;font-size:.92rem}button.primary{background:#111;color:#fff;border-color:#333}button.danger{border-color:#765025;color:#ffc400}button:disabled{opacity:.72;cursor:wait}.refresh-spinner{display:inline-block;width:14px;height:14px;margin-right:7px;border:2px solid rgba(255,196,0,.32);border-top-color:#ffc400;border-radius:50%;vertical-align:-2px;animation:refresh-spin .75s linear infinite}@keyframes refresh-spin{to{transform:rotate(360deg)}}.parse-note{margin-top:8px;color:var(--muted);font-size:.82rem;line-height:1.35}
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}table{width:100%;min-width:1040px;border-collapse:collapse;font-size:.88rem}th,td{border-bottom:1px solid var(--line);padding:7px 5px;text-align:left;white-space:nowrap;vertical-align:middle}.center{text-align:center}.route{font-weight:900}.call-by-btn{border:0;cursor:pointer;font:inherit;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}th{background:#111922;color:#c9d1d9;font-size:.73rem;font-weight:900}td{color:#eef3f8}
 .badge{font-weight:900;border-radius:8px;display:inline-block;padding:3px 7px}.badge-green{background:rgba(65,212,90,.14);color:var(--green)}.badge-amber{background:rgba(255,196,0,.14);color:var(--amber)}.small{display:block;color:var(--muted);font-size:.72rem;margin-top:2px}
 .status-planned{color:var(--amber);font-weight:900}.status-delayed{color:var(--amber);font-weight:900}.status-action{color:var(--red);font-weight:900}.status-safe{color:var(--green);font-weight:900}.status-unknown{color:var(--grey);font-weight:900}.row-safe{background:rgba(65,212,90,.06)}.row-pre{background:rgba(88,166,255,.07)}.row-live{background:rgba(255,196,0,.06)}.row-critical{background:rgba(255,75,75,.12)}.row-departed{background:rgba(255,255,255,.035)}
@@ -432,7 +432,7 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 .legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 12px;color:#c9d1d9;font-size:.82rem}.legend span{display:inline-flex;gap:6px;align-items:center}.note{padding:10px 12px;color:var(--muted);font-size:.78rem;border-top:1px solid var(--line);line-height:1.35}
 .errorbox{display:none;padding:10px 14px;border:1px solid rgba(255,75,75,.5);background:rgba(255,75,75,.08);border-radius:12px;margin-bottom:12px;color:#ffb8b8}
 .crew-detail-row td{padding:0 8px 8px;border-bottom:1px solid var(--line);white-space:normal}.crew-detail{margin:7px 0 0;padding:11px 13px;background:#f7f8fb;color:#111;border-radius:12px;border:1px solid #cfd7e2;line-height:1.35;white-space:pre-line;position:relative}.crew-detail-close{position:absolute;right:9px;top:8px;border:0;background:transparent;color:#1677c8;padding:4px 7px;font-size:.84rem}.crew-detail-text{padding-right:48px}.limiting-rule{margin:8px 48px 8px 0;padding:8px 10px;border:1px solid #d6aa00;border-radius:8px;background:#fff1ad;color:#111;font-weight:900}
-@media(max-width:800px){body{padding:7px}.app{padding-top:4px}.header{grid-template-columns:1fr;gap:8px;margin-bottom:8px}h1{font-size:1.42rem}.sub{font-size:.82rem;line-height:1.3}.controls{grid-template-columns:1fr 1fr 1fr;gap:5px}.control{padding:7px 5px}.control label{font-size:.62rem}.control input,select{font-size:1rem}.clock{font-size:1.08rem}.fico{padding:10px}.fico-grid{grid-template-columns:1fr;gap:9px}textarea{min-height:92px;font-size:.74rem;padding:8px}.button-col{gap:8px}button{padding:10px;font-size:.86rem}.parse-note{font-size:.74rem;margin-top:2px}.guard{grid-template-columns:1fr}.table-scroll{margin:0}table{font-size:.76rem;min-width:1000px}th,td{padding:6px 4px}th{font-size:.66rem}.dot{width:15px;height:15px}.checks{gap:4px}.check-link{padding:4px 5px;font-size:.7rem}.badge{padding:2px 5px}.legend{gap:10px;padding:9px 10px;font-size:.74rem}.note{font-size:.72rem;padding:9px 10px}}
+@media(max-width:800px){body{padding:7px}.app{padding-top:4px}.header{grid-template-columns:1fr;gap:8px;margin-bottom:8px}h1{font-size:1.42rem}.sub{font-size:.82rem;line-height:1.3}.controls{grid-template-columns:1fr 1fr 1fr;gap:5px}.control{padding:7px 5px}.control label{font-size:.62rem}.control input,select{font-size:1rem}.clock{font-size:1.08rem}.fico{padding:10px}.fico-grid{grid-template-columns:1fr;gap:9px}textarea{min-height:92px;font-size:.74rem;padding:8px}.select-fico-btn{font-size:.7rem}.select-fico-radio{width:14px;height:14px}.button-col{gap:8px}button{padding:10px;font-size:.86rem}.parse-note{font-size:.74rem;margin-top:2px}.guard{grid-template-columns:1fr}.table-scroll{margin:0}table{font-size:.76rem;min-width:1000px}th,td{padding:6px 4px}th{font-size:.66rem}.dot{width:15px;height:15px}.checks{gap:4px}.check-link{padding:4px 5px;font-size:.7rem}.badge{padding:2px 5px}.legend{gap:10px;padding:9px 10px;font-size:.74rem}.note{font-size:.72rem;padding:9px 10px}}
 @media(max-width:480px){body{padding:5px}.controls{gap:4px}.control{padding:6px 3px}.fico{padding:8px}textarea{min-height:82px}.table-scroll{border-top:1px solid var(--line)}table{font-size:.72rem;min-width:960px}th,td{padding:5px 3px}.legend{gap:8px}.legend .dot{width:14px;height:14px}}
 
 .live-badge{display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;background:rgba(65,212,90,.14);border:1px solid rgba(65,212,90,.55);color:#41d45a;font-size:.72rem;font-weight:900;vertical-align:2px}
@@ -443,12 +443,12 @@ button{border:1px solid #244b78;border-radius:10px;padding:11px 12px;background:
 <body>
 <main class="app">
 <section class="header">
-  <div><h1>HSB Reserve App <span class="version">v40</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
+  <div><h1>HSB Reserve App <span class="version">v42</span></h1><p class="sub">All times in Zulu (Z). Manual FlightAware refresh only. Monthly app cap: $8.</p><p class="sub" id="headerUsage">AeroAPI guard loading...</p><p class="sub" id="liveLine">Not refreshed</p></div>
   <div><div class="controls"><div class="control"><label for="hsbStart">HSB start</label><select id="hsbStart">${quarterHourOptions("12:00")}</select></div><div class="control"><label for="hsbEnd">HSB finish</label><select id="hsbEnd">${quarterHourOptions("20:00")}</select></div><div class="control"><label>UTC</label><div class="clock" id="utcClock">----Z</div></div></div><p class="sub" style="text-align:right;margin-top:8px"><strong>A380 FICO departures: DP LHR a8</strong></p></div>
 </section>
 <div id="errorBox" class="errorbox"></div>
 <section class="card guard" style="display:none"><div id="usageGuard">Loading usage guard...</div><div><button id="usageBtn">Check usage</button></div></section>
-<section class="card fico"><div class="fico-grid"><div><label for="ficoInput">Paste BA/FICO flight list</label><textarea id="ficoInput" spellcheck="false">${esc(DEFAULT_FICO)}</textarea></div><div class="button-col"><button class="primary" id="parseBtn">Parse FICO list</button><button class="danger" id="statusBtn">Refresh live status</button><div id="parseNote" class="parse-note">No automatic paid polling.</div></div></div></section>
+<section class="card fico"><div class="fico-grid"><div><div class="fico-label-row"><label for="ficoInput">Paste BA/FICO flight list</label><button type="button" id="selectFicoBtn" class="select-fico-btn" aria-label="Select all FICO text" title="Select all FICO text"><span class="select-fico-radio" aria-hidden="true"></span><span>Select all</span></button></div><textarea id="ficoInput" spellcheck="false">${esc(DEFAULT_FICO)}</textarea></div><div class="button-col"><button class="primary" id="parseBtn">Parse FICO list</button><button class="danger" id="statusBtn">Refresh live status</button><div id="parseNote" class="parse-note">No automatic paid polling.</div></div></div></section>
 <section class="card">
   <div class="table-scroll"><table><thead><tr><th></th><th>Flight</th><th>Route</th><th class="center">2hrs b4 Report</th><th>Report</th><th>T/O</th><th>Block</th><th>Call by</th><th>Status</th><th>Countdown</th><th>Checks</th></tr></thead><tbody id="rows"></tbody></table></div>
   <div class="legend"><span><i class="dot dot-green"></i> Safe</span><span><i class="dot dot-amber"></i> Still callable &gt;30m</span><span><i class="dot dot-red"></i> Call deadline ≤30m</span><span><i class="dot dot-blue"></i> HSB not started</span><span><i class="dot dot-grey"></i> Unknown / refresh</span></div>
@@ -933,7 +933,24 @@ async function checkUsage(){
   }
 }
 
+function setRefreshBusy(busy,label){
+  var btn=byId("statusBtn");
+  if(!btn)return;
+  btn.disabled=!!busy;
+  btn.setAttribute("aria-busy", busy ? "true" : "false");
+  var parseBtn=byId("parseBtn");
+  if(parseBtn)parseBtn.disabled=!!busy;
+  if(busy){
+    btn.innerHTML = "<span class='refresh-spinner' aria-hidden='true'></span>" + (label || "Refreshing...");
+  }else{
+    btn.textContent="Refresh live status";
+  }
+}
+
 async function refreshStatus(){
+  setRefreshBusy(true,"Checking...");
+  byId("parseNote").textContent="Checking AeroAPI allowance...";
+  try {
   if (!flights.length) parseAndRender();
   await checkUsage();
   if (!usageGuard || !usageGuard.ok) {
@@ -949,6 +966,8 @@ async function refreshStatus(){
     byId("parseNote").textContent = "Live refresh cancelled. No AeroAPI calls made.";
     return;
   }
+  setRefreshBusy(true,"Refreshing...");
+  byId("parseNote").textContent = "Refreshing live status...";
   try {
     var hsbStartForRefresh = toMin(byId("hsbStart").value);
     var hsbEndForRefresh = normaliseEnd(hsbStartForRefresh, toMin(byId("hsbEnd").value));
@@ -984,6 +1003,9 @@ async function refreshStatus(){
   } catch(e) {
     byId("parseNote").textContent = "Live status fetch failed: " + String(e);
     showError("Live status fetch failed: " + String(e));
+  }
+  } finally {
+    setRefreshBusy(false);
   }
 }
 
@@ -1195,6 +1217,15 @@ async function start(){
   byId("utcClock").textContent = utcNowText();
   parseAndRender();
   byId("parseBtn").addEventListener("click", parseAndRender);
+  byId("selectFicoBtn").addEventListener("click", function(){
+    var box = byId("ficoInput");
+    try { box.focus({ preventScroll:true }); } catch (_) { box.focus(); }
+    box.select();
+    try { box.setSelectionRange(0, box.value.length); } catch (_) {}
+    var btn = byId("selectFicoBtn");
+    btn.classList.add("selected");
+    setTimeout(function(){ btn.classList.remove("selected"); }, 900);
+  });
   byId("statusBtn").addEventListener("click", refreshStatus);
   byId("usageBtn").addEventListener("click", checkUsage);
   byId("hsbStart").addEventListener("input", function(){
